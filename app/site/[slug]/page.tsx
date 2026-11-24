@@ -33,7 +33,7 @@ export default async function SitePage({ params }: { params: Promise<{ slug: str
         All crew sites
       </Link>
       {site && initial ? (
-        <PlanView site={site} initialHours={initial.hours} initialSource={initial.source} mode={adapter.mode} />
+        <PlanView site={site} initialHours={initial.hours} initialSource={initial.source} initialDate={initial.date} mode={adapter.mode} />
       ) : (
         <StoredSitePlan slug={slug} />
       )}

@@ -1,5 +1,5 @@
-// npm run proof: runs the live engine proof and the test suite, then rewrites the two PROOF
-// blocks in README.md with what actually happened. It never throws, never invents a number,
+// npm run proof: runs the live engine proof (live-weather and demo-path) and the test suite,
+// then rewrites the three PROOF blocks in README.md with what actually happened. It never throws, never invents a number,
 // writes only inside this repo (README.md and one temp file under node_modules/.cache), exits 0
 // on every path, and stops itself after 110 seconds.
 
@@ -65,21 +65,53 @@ function fmtHour(h) {
   return `${String(h).padStart(2, "0")}:00`;
 }
 
-async function liveWeatherProof() {
+/** Run the engine script once; both the live-weather and the demo-path blocks read its result. */
+async function engineRun() {
   const r = await run("npx", ["--no-install", "tsx", "scripts/proof-engine.ts"]);
-  if (r.spawnError) return { line: "Not run in this build: the engine script could not start (is tsx installed?).", summary: "live-weather: engine script did not start" };
-  if (r.timedOut) return { line: "Not run in this build: the engine script did not finish within 90 seconds.", summary: "live-weather: timed out" };
+  if (r.spawnError) return { fail: "the engine script could not start (is tsx installed?)" };
+  if (r.timedOut) return { fail: "the engine script did not finish within 90 seconds" };
   const jsonLine = r.stdout
     .split(/\r?\n/)
     .reverse()
     .find((l) => l.startsWith("PROOF_JSON "));
-  if (!jsonLine) return { line: "Not run in this build: the engine script printed no result.", summary: "live-weather: no result line" };
-  let out;
+  if (!jsonLine) return { fail: "the engine script printed no result" };
   try {
-    out = JSON.parse(jsonLine.slice("PROOF_JSON ".length));
+    return { out: JSON.parse(jsonLine.slice("PROOF_JSON ".length)) };
   } catch {
-    return { line: "Not run in this build: the engine script printed an unreadable result.", summary: "live-weather: unreadable result" };
+    return { fail: "the engine script printed an unreadable result" };
   }
+}
+
+const SITE_NAMES = {
+  "phoenix-desert-ridge-framing": "Phoenix",
+  "cuiaba-soy-field-crew": "Cuiabá",
+};
+
+function demoPathProof(engine) {
+  if (engine.fail) return { line: `Not run in this build: ${engine.fail}.`, summary: "demo-path: not run" };
+  const demo = engine.out.demoPath;
+  if (!demo) return { line: "Not run in this build: the engine script printed no demo path result.", summary: "demo-path: no result" };
+  if (!demo.ok) return { line: `Not run in this build: ${demo.reason}.`, summary: `demo-path: not run (${demo.reason})` };
+  const parts = (demo.steps ?? []).map((s) => {
+    const name = SITE_NAMES[s.slug] ?? s.slug;
+    if (!s.ok) return `${name}: getHours failed with ${s.code} after ${s.ms} ms`;
+    const src = s.source === "seed" ? "seed fallback" : `live ${s.source}`;
+    const gap = s.bandGap
+      ? `band gap at ${fmtHour(s.bandGap.hour)} (heat index ${s.bandGap.hiBand}, ${s.bandGap.status})`
+      : "no band gap hour (no hour that sun WBGT calls rest or stop)";
+    return `${name} ${s.date}: ${s.hours} hours from ${src} in ${s.ms} ms, ${gap}`;
+  });
+  const over = (demo.steps ?? []).filter((s) => s.ms > 5000).length;
+  const line =
+    `Ran on ${today()} through getAdapter() in real mode, cold (no Next.js cache outside the server): ` +
+    `${parts.join("; ")}.` +
+    (over > 0 ? ` ${over} call(s) took over 5 s.` : " Every call finished under 5 s.");
+  return { line, summary: `demo-path: ${(demo.steps ?? []).map((s) => `${s.slug}=${s.ms}ms`).join(" ")}` };
+}
+
+async function liveWeatherProof(engine) {
+  if (engine.fail) return { line: `Not run in this build: ${engine.fail}.`, summary: "live-weather: not run" };
+  const out = engine.out;
   if (!out.ok) {
     const line =
       out.code === "parse_failure"
@@ -141,10 +173,14 @@ function replaceBlock(text, name, line) {
   return `${text.slice(0, i + begin.length)}\n${line}\n${text.slice(j)}`;
 }
 
-async function writeReadme(live, tests) {
+async function writeReadme(live, tests, demo) {
   try {
     const before = await readFile(README, "utf8");
-    const after = replaceBlock(replaceBlock(before, "live-weather", live.line), "tests", tests.line);
+    const after = replaceBlock(
+      replaceBlock(replaceBlock(before, "live-weather", live.line), "tests", tests.line),
+      "demo-path",
+      demo.line
+    );
     if (after !== before) await writeFile(README, after, "utf8");
   } catch (e) {
     console.log(`proof: README.md not updated (${e && e.message ? e.message : e})`);
@@ -153,10 +189,8 @@ async function writeReadme(live, tests) {
 
 async function main() {
   const hardStop = setTimeout(async () => {
-    await writeReadme(
-      { line: "Not run in this build: the proof did not finish within two minutes." },
-      { line: "Not run in this build: the proof did not finish within two minutes." }
-    );
+    const stopped = { line: "Not run in this build: the proof did not finish within two minutes." };
+    await writeReadme(stopped, stopped, stopped);
     console.log("proof: stopped after 110 s");
     process.exit(0);
   }, HARD_STOP_MS);
@@ -164,13 +198,18 @@ async function main() {
 
   let live = { line: NOT_RUN_LIVE_OFFLINE, summary: "live-weather: not run" };
   let tests = { line: "Not run in this build: the test runner could not start.", summary: "tests: not run" };
+  let demo = { line: "Not run in this build: the engine script did not run.", summary: "demo-path: not run" };
   try {
-    [live, tests] = await Promise.all([liveWeatherProof(), testsProof()]);
+    const [engine, t] = await Promise.all([engineRun(), testsProof()]);
+    tests = t;
+    live = await liveWeatherProof(engine);
+    demo = demoPathProof(engine);
   } catch (e) {
     console.log(`proof: unexpected error (${e && e.message ? e.message : e})`);
   }
-  await writeReadme(live, tests);
+  await writeReadme(live, tests, demo);
   console.log(live.summary);
+  console.log(demo.summary);
   console.log(tests.summary);
   clearTimeout(hardStop);
   process.exit(0);

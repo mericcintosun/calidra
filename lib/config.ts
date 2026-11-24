@@ -15,6 +15,13 @@ export const HTTP_TIMEOUT_MS = 8000;
 /** Extra attempts after the first one, for timeouts, network errors and 5xx answers only. */
 export const HTTP_RETRIES = 1;
 
+/**
+ * Most time a page waits for live hours before it serves the seed fallback. Every demo step
+ * must render in under 5 s, so this leaves about 1 s for the engine and the render. Slower
+ * upstream answers still land in the cache for the next visit.
+ */
+export const HOURS_BUDGET_MS = 4000;
+
 /** Next.js data cache windows, in seconds. */
 export const FORECAST_REVALIDATE_S = 1800;
 export const ARCHIVE_REVALIDATE_S = 86400;

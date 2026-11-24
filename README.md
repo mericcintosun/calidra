@@ -16,7 +16,7 @@ So a small subcontractor with no WBGT meter cannot answer the question that matt
 2. Solves the black globe and natural wet bulb temperatures in the browser with an energy balance after Liljegren et al. (2008), iterating each one until it moves less than 0.02 K, and combines them into outdoor WBGT.
 3. Runs every hour against the ACGIH curves for the chosen workload (light 180 W to very heavy 520 W) and clothing, and turns the result into work and rest minutes. Veterans use the TLV. Workers new this week use the action limit plus the NIOSH ramp: 20 percent of a normal exposure on day one, 20 percent more each day.
 4. Scans every shift start from 04:00 and reports the one with the most productive crew-minutes. Drag the slider and the rest counter rolls down in real time.
-5. Shows the heat index next to WBGT for the same hour, so you can see when "Caution" in the shade means "stop heavy work" in the sun.
+5. Shows the heat index next to WBGT for the same hour, so you can see when a shade reading such as "Caution" or "Extreme caution" means "stop heavy work" in the sun.
 
 Seven of the ten seeded sites replay real heat days from the Open-Meteo archive (Phoenix on 19 July 2023, Houston, the San Joaquin Valley, Andalusia, Delhi, the Çukurova plain, Miami). Three sit in the southern hemisphere, where it is summer now, on tomorrow's live forecast.
 
@@ -49,7 +49,8 @@ npm install
 npm run dev
 # open http://localhost:3000
 npm test        # Vitest: heat engine, schemas, HTTP helper
-npm run proof   # one live Open-Meteo call plus the test run, written into the Proof section below
+npm run proof   # live Open-Meteo calls plus the test run, written into the Proof section below
+npm run demo:reset  # seed check, then prints the reset URL /?demo-reset=1
 ```
 
 No keys are needed. `npm run build` produces the production bundle; `npm run seed` checks that the 10 seed sites in `lib/data/seed.ts` keep unique, stable ids, and writes nothing. `npm test` runs offline. `npm run proof` needs network for the live part; without it, it writes a "Not run" line instead of numbers.
@@ -59,18 +60,34 @@ No keys are needed. `npm run build` produces the production bundle; `npm run see
 Written by `npm run proof` (`scripts/proof.mjs`). Live weather: one archive call for Phoenix on 19 Jul 2023 through `lib/open-meteo.ts`, then the WBGT engine, the heavy-work planner and the heat index mismatch search.
 
 <!-- PROOF:BEGIN live-weather -->
-Ran on 2026-11-24: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 292 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
+Ran on 2026-11-24: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 297 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
 <!-- PROOF:END live-weather -->
+
+Demo path: `getHours` timed through `getAdapter()` in real mode for the two demo sites (Phoenix on 19 Jul 2023 and Cuiabá tomorrow), with the source that came back and the heat index band gap hour from `findBandGap`.
+
+<!-- PROOF:BEGIN demo-path -->
+Ran on 2026-11-24 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 55 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-25: 24 hours from live forecast in 166 ms, band gap at 09:00 (heat index Extreme caution, rest). Every call finished under 5 s.
+<!-- PROOF:END demo-path -->
 
 Tests:
 
 <!-- PROOF:BEGIN tests -->
-Ran on 2026-11-24 with Vitest: 29 passed, 1 failed, 1 skipped. Failing: demo contract Phoenix seed hours give a mismatch hour through computeHeat, planDay and findMismatch.
+Ran on 2026-11-24 with Vitest: 37 passed, 0 failed, 1 skipped.
 <!-- PROOF:END tests -->
 
 ### Adapter modes
 
-Pages and the `/api/*` routes read data through `getAdapter()` in `lib/adapter.ts`. `ADAPTER_MODE=fake` (the default when unset) serves the seed sites and expands their stored day profiles offline, with a small built-in place list for `/new`. `ADAPTER_MODE=real` calls the Open-Meteo forecast, archive and geocoding APIs from the server, caches answers (30 minutes for forecasts, 24 hours for archive days and place searches) and falls back to the seed profile if an hours call fails. The site page badge and a plain sentence under it say whether the hours are live or sample data. `/api/*` errors come back as `{ error: { error, hint } }` with a fixed code (`invalid_input`, `upstream_timeout`, `upstream_error`, `parse_failure`, `not_configured`). See `.env.example`.
+Pages and the `/api/*` routes read data through `getAdapter()` in `lib/adapter.ts`. `ADAPTER_MODE=fake` (the default when unset) serves the seed sites and expands their stored day profiles offline, with a small built-in place list for `/new`. `ADAPTER_MODE=real` calls the Open-Meteo forecast, archive and geocoding APIs from the server, caches hours with `unstable_cache` per place and date (30 minutes for forecasts, 24 hours for archive days; place searches 24 hours through the fetch cache), waits at most 4 s for live hours (`HOURS_BUDGET_MS`), and falls back to the seed profile if an hours call fails or runs over. The site page badge and a plain sentence under it say whether the hours are live or sample data. `/api/*` errors come back as `{ error: { error, hint } }` with a fixed code (`invalid_input`, `upstream_timeout`, `upstream_error`, `parse_failure`, `not_configured`). See `.env.example`.
+
+### Persistence
+
+Sites made on `/new` are saved in the visitor's browser (localStorage), through `lib/site-store.ts` only. The demo needs one small list that is read back in the same browser, so a server store would add a secret and a service for nothing the demo shows. Limit: the list is not shared across devices or browsers, and clearing site data removes it. Each saved site's slug ends in a hash of its inputs (`siteKey`), so saving the same site twice replaces the row instead of adding a second one.
+
+Migrations: none. There is no database and no schema push.
+
+### Demo reset
+
+`npm run demo:reset` runs the seed check and prints the reset URL. Open `/?demo-reset=1` in the demo browser: `components/demo-reset.tsx` clears the sites saved there, removes the parameter and reloads, leaving the 10 seed sites. There is no server store and no chain state, so nothing else needs resetting.
 
 ## Routes
 
