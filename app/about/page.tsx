@@ -60,14 +60,14 @@ export default function AboutPage() {
 
       <section aria-labelledby="steps" className="space-y-4">
         <h2 id="steps" className="text-3xl font-bold">
-          Five steps, all in the browser
+          Five steps from weather to break minutes
         </h2>
         <ol className="space-y-3">
           {STEPS.map((s, i) => (
             <li key={s.title}>
               <Card className="p-0">
                 <details className="group p-5">
-                  <summary className="flex cursor-pointer list-none items-start gap-4 [&::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-start gap-4 rounded-xl [&::-webkit-details-marker]:hidden">
                     <span className="font-display text-2xl font-bold text-gold">{i + 1}</span>
                     <span className="space-y-1">
                       <span className="block font-display text-lg font-semibold">{s.title}</span>
@@ -86,7 +86,8 @@ export default function AboutPage() {
         <h2 id="limits-table" className="text-3xl font-bold">
           The thresholds in use
         </h2>
-        <Card tone="glow" className="overflow-x-auto p-0">
+        {/* The table keeps its columns and scrolls inside this wrapper on narrow screens. */}
+        <Card tone="glow" className="max-w-full overflow-x-auto p-0">
           <table className="w-full min-w-[34rem] text-left text-sm">
             <thead className="border-b border-line text-muted-foreground">
               <tr>

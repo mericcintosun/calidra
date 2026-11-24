@@ -30,7 +30,10 @@ export function LiveStripCell({ site, hours }: { site: Site; hours: HourlyWeathe
     <div className="flex h-full flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          <Link href={`/site/${site.slug}`} className="font-semibold text-foreground underline decoration-gold underline-offset-4">
+          <Link
+            href={`/site/${site.slug}`}
+            className="inline-flex min-h-11 items-center font-semibold text-foreground underline decoration-gold underline-offset-4"
+          >
             {site.city}, {formatSiteDate(site.date)}
           </Link>{" "}
           · crew of {site.crewSize} · shift {hourLabel(site.shiftStart)} to {hourLabel(site.shiftStart + site.shiftHours)}

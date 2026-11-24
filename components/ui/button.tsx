@@ -17,11 +17,12 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/85",
         link: "text-primary underline decoration-primary/50 underline-offset-4 hover:decoration-primary",
       },
+      // Every size keeps at least a 44 px hit area (min-h-11) for gloved or sweaty thumbs.
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-lg px-3 text-xs",
-        lg: "h-12 rounded-2xl px-7 text-base",
-        icon: "h-10 w-10",
+        default: "min-h-11 px-4 py-2",
+        sm: "min-h-11 rounded-xl px-3 text-xs",
+        lg: "min-h-12 rounded-2xl px-7 text-base",
+        icon: "min-h-11 min-w-11",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
