@@ -51,6 +51,9 @@ export const hoursQuerySchema = z
 
 export type HoursQuery = z.infer<typeof hoursQuerySchema>;
 
+/** /api/sites/[slug]: the path segment must look like a site slug before any lookup. */
+export const siteSlugSchema = z.string().regex(SLUG_PATTERN);
+
 export const placesQuerySchema = z.object({
   q: z.string().trim().min(PLACE_QUERY_MIN).max(PLACE_QUERY_MAX),
 });
