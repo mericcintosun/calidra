@@ -40,7 +40,7 @@ export default function NewSitePage() {
             {live
               ? " The server asks Open-Meteo, with no key and no account."
               : " In sample mode the server answers from its stored profiles and calls no outside service."}{" "}
-            Sites are saved in localStorage on this device.
+            Sites are saved in this browser only, so they do not show on your other devices.
           </p>
         </Card>
       </aside>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +9,17 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { hintFor, type ApiError } from "@/lib/errors";
 import { WORKLOADS, WORKLOAD_KEYS, hourLabel, isoDate } from "@/lib/heat";
-import { saveLocalSite, slugify } from "@/lib/site-store";
+import { saveLocalSite, siteKey, slugify } from "@/lib/site-store";
 import type { ApiResponse, HourlyResult, Place, Site, Workload } from "@/lib/types";
 
-type Status = { kind: "idle" } | { kind: "busy"; message: string } | { kind: "error"; message: string };
+/** What "Try again" repeats after an error: the place search, the save, or nothing. */
+type RetryKind = "find" | "save" | "none";
+
+type Status =
+  | { kind: "idle" }
+  | { kind: "busy"; message: string }
+  | { kind: "error"; message: string; retry: RetryKind }
+  | { kind: "noPlace"; query: string };
 
 type ApiOutcome<T> = { ok: true; data: T; source: ApiResponse<T>["source"] } | { ok: false; error: ApiError };
 
@@ -79,17 +86,20 @@ export function NewSiteForm() {
   const [newWorkers, setNewWorkers] = useState(1);
   const [shiftStart, setShiftStart] = useState(7);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  // A double click can fire submit twice before React re-renders the disabled button,
+  // so the ref blocks a second save while the first is in flight.
+  const savingRef = useRef(false);
 
   async function find(q = query) {
     if (q.trim().length < 2) return;
     setStatus({ kind: "busy", message: "Searching places…" });
     const r = await getApi<Place[]>(`/api/places?q=${encodeURIComponent(q.trim())}`);
     if (!r.ok) {
-      setStatus({ kind: "error", message: placeErrorMessage(r.error) });
+      setStatus({ kind: "error", message: placeErrorMessage(r.error), retry: r.error.error === "invalid_input" ? "none" : "find" });
       return;
     }
     setPlaces(r.data);
-    setStatus(r.data.length ? { kind: "idle" } : { kind: "error", message: `No place called "${q}" found. Try a nearby city.` });
+    setStatus(r.data.length ? { kind: "idle" } : { kind: "noPlace", query: q.trim() });
   }
 
   function presetPhoenix() {
@@ -104,17 +114,27 @@ export function NewSiteForm() {
     setPlaces(null);
   }
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function save(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (savingRef.current) return;
     if (!place) {
-      setStatus({ kind: "error", message: "Pick a place from the search results first." });
+      setStatus({ kind: "error", message: "Pick a place from the search results first.", retry: "none" });
       return;
     }
+    savingRef.current = true;
+    try {
+      await saveSite(place);
+    } finally {
+      savingRef.current = false;
+    }
+  }
+
+  async function saveSite(place: Place) {
     setStatus({ kind: "busy", message: `Fetching 24 hours for ${place.name}…` });
     const qs = new URLSearchParams({ lat: String(place.latitude), lon: String(place.longitude), date });
     const outcome = await getApi<HourlyResult>(`/api/hours?${qs.toString()}`);
     if (!outcome.ok) {
-      setStatus({ kind: "error", message: hoursErrorMessage(outcome.error) });
+      setStatus({ kind: "error", message: hoursErrorMessage(outcome.error), retry: outcome.error.error === "invalid_input" ? "none" : "save" });
       return;
     }
     try {
@@ -122,8 +142,20 @@ export function NewSiteForm() {
       if (r.hours.length === 0) throw new Error("No hourly data for that place and date");
       const offsetHours = Math.round(((r.hours[0].utcMs - Date.UTC(...ymdh(r.hours[0].local))) / -3600000) * 2) / 2;
       const crewName = name.trim() || `${place.name} crew`;
+      const cappedNew = Math.min(newWorkers, crewSize);
+      // Same name, place, date and settings give the same slug, so a repeat save replaces the row.
+      const key = siteKey({
+        name: crewName,
+        lat: place.latitude,
+        lon: place.longitude,
+        date: r.date,
+        workload,
+        crewSize,
+        newWorkers: cappedNew,
+        shiftStart,
+      });
       const site: Site = {
-        slug: slugify(crewName),
+        slug: slugify(crewName, key),
         name: crewName,
         trade: `${WORKLOADS[workload].label} outdoor work`,
         city: place.name,
@@ -139,7 +171,7 @@ export function NewSiteForm() {
         workload,
         clothing: "workClothes",
         crewSize,
-        newWorkers: Math.min(newWorkers, crewSize),
+        newWorkers: cappedNew,
         newWorkerDay: 1,
         shiftStart,
         shiftHours: 8,
@@ -147,11 +179,30 @@ export function NewSiteForm() {
         snapshot: r.hours,
         createdLocally: true,
       };
-      saveLocalSite(site);
+      const result = saveLocalSite(site);
+      if (result.status === "failed") {
+        setStatus({
+          kind: "error",
+          message:
+            result.reason === "quota"
+              ? "This browser's storage is full. Remove some saved data for this site, then try again."
+              : "This browser blocked saving (private mode can do this). Allow site data, then try again.",
+          retry: "save",
+        });
+        return;
+      }
+      // "created" and "duplicate" both end on the collection: a duplicate replaced its own row.
+      setStatus({ kind: "busy", message: result.status === "duplicate" ? "Already saved, opening sites…" : "Saved, opening sites…" });
       router.push(`/?sort=peak`);
     } catch (err) {
-      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Could not fetch weather" });
+      setStatus({ kind: "error", message: err instanceof Error ? err.message : "Could not fetch weather", retry: "save" });
     }
+  }
+
+  function retryLast() {
+    if (status.kind !== "error") return;
+    if (status.retry === "find") void find();
+    if (status.retry === "save") void save();
   }
 
   const busy = status.kind === "busy";
@@ -220,6 +271,23 @@ export function NewSiteForm() {
               ))}
             </ul>
           )}
+          {status.kind === "noPlace" && (
+            <div role="status" className="flex flex-col items-start gap-2 rounded-xl border border-line bg-surface p-4">
+              <p className="font-display text-base font-semibold">No place called &quot;{status.query}&quot; found</p>
+              <p className="text-muted-foreground">Try a nearby city, or start from the Phoenix heat day used in the demo.</p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  presetPhoenix();
+                  setStatus({ kind: "idle" });
+                }}
+              >
+                Fill with Phoenix, 19 Jul 2023
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -263,9 +331,14 @@ export function NewSiteForm() {
           </Button>
           {status.kind === "busy" && <Badge variant="outline">{status.message}</Badge>}
           {status.kind === "error" && (
-            <p role="alert" className="rounded-xl border border-bad bg-surface px-3 py-2 text-sm">
-              {status.message}
-            </p>
+            <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-bad bg-surface px-3 py-2 text-sm">
+              <span>{status.message}</span>
+              {status.retry !== "none" && (
+                <Button type="button" size="sm" variant="secondary" onClick={retryLast}>
+                  Try again
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </form>
