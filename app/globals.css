@@ -1,31 +1,47 @@
 @import "tailwindcss";
 
-/* shadcn-style design tokens. The ONLY place colors live: restyle a project by
-   editing these variables from IDENTITY.md; components never carry hex.
-   TEMPLATE placeholder palette: warm neutral, deliberately NOT the navy ground +
-   teal accent the scaffold rules ban, so a token the scaffold forgets to
-   rewrite cannot reintroduce that look. Every value below is replaced. */
+/* Design tokens. Every hex below comes from the IDENTITY.md key block (D4 velvet).
+   Components never carry a raw hex: they use these variables through Tailwind. */
 :root {
-  --background: oklch(0.985 0.004 80);
-  --foreground: oklch(0.2 0.01 60);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.01 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 60);
-  --primary: oklch(0.45 0.12 40);
-  --primary-foreground: oklch(0.98 0.005 80);
-  --secondary: oklch(0.94 0.008 80);
-  --secondary-foreground: oklch(0.25 0.01 60);
-  --muted: oklch(0.94 0.008 80);
-  --muted-foreground: oklch(0.5 0.01 60);
-  --accent: oklch(0.92 0.02 60);
-  --accent-foreground: oklch(0.2 0.01 60);
-  --destructive: oklch(0.55 0.19 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 80);
-  --input: oklch(0.88 0.01 80);
-  --ring: oklch(0.45 0.12 40);
-  --radius: 0.375rem;
+  --ground: #171020;
+  --surface: #1f1629;
+  --deep: #291d35;
+  --line: #3a2a4b;
+  --ink: #f0eaf6;
+  --lavender: #b78df2;
+  --on-accent: #171020;
+  --gold: #e0b84e;
+  --ok: #69a56f;
+  --warn: #e0b84e;
+  --bad: #ef6a5a;
+
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--deep);
+  --popover-foreground: var(--ink);
+  --primary: var(--lavender);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--deep);
+  --secondary-foreground: var(--ink);
+  --muted: var(--deep);
+  --muted-foreground: color-mix(in oklab, var(--ink) 64%, var(--ground));
+  --accent: var(--deep);
+  --accent-foreground: var(--ink);
+  --destructive: var(--bad);
+  --destructive-foreground: var(--ground);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--lavender);
+  --radius: 1rem;
+
+  /* The one soft accent glow a screen is allowed. */
+  --glow: 0 0 0 1px color-mix(in oklab, var(--lavender) 38%, transparent),
+    0 22px 70px -24px color-mix(in oklab, var(--lavender) 60%, transparent);
+  /* Elevation for stacked plum panels. */
+  --lift: 0 1px 0 0 color-mix(in oklab, var(--ink) 6%, transparent) inset,
+    0 14px 30px -18px color-mix(in oklab, var(--ground) 90%, transparent);
 }
 
 @theme inline {
@@ -48,13 +64,71 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-deep: var(--deep);
+  --color-line: var(--line);
+  --color-gold: var(--gold);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-glow: var(--glow);
+  --shadow-lift: var(--lift);
+
+  --font-display: var(--font-bricolage), "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --font-sans: var(--font-public-sans), "Helvetica Neue", Arial, system-ui, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: var(--lavender);
+    color: var(--on-accent);
+  }
+}
+
+/* MOTION M6 drop: one keyframe block, prefix calidra-. Starts visible enough to read
+   with JavaScript off and settles with a slight overshoot. */
+@keyframes calidra-drop {
+  from {
+    opacity: 0.35;
+    transform: translateY(-14px) rotate(-1.5deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.calidra-drop,
+.calidra-drop-group > * {
+  animation: calidra-drop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.calidra-drop-group > *:nth-child(2) { animation-delay: 70ms; }
+.calidra-drop-group > *:nth-child(3) { animation-delay: 140ms; }
+.calidra-drop-group > *:nth-child(4) { animation-delay: 210ms; }
+.calidra-drop-group > *:nth-child(5) { animation-delay: 280ms; }
+.calidra-drop-group > *:nth-child(6) { animation-delay: 350ms; }
+.calidra-drop-group > *:nth-child(7) { animation-delay: 420ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .calidra-drop,
+  .calidra-drop-group > * {
+    animation: none;
+  }
 }
