@@ -35,7 +35,7 @@ If the network fails, each site falls back to its stored day profile and the pag
 ## Tech stack
 
 - Next.js 15 (App Router), React 19, TypeScript strict
-- Tailwind CSS v4 with shadcn-style primitives
+- Tailwind CSS 4 with shadcn-style primitives
 - AutoAnimate for the site list, Motion for the rolling rest counter
 - Open-Meteo Forecast, Historical and Geocoding APIs
 - Deployed on Vercel
@@ -48,7 +48,11 @@ npm run dev
 # open http://localhost:3000
 ```
 
-No environment variables are needed. `npm run build` produces the production bundle; `npm run seed` is a no-op because the seed sites live in `lib/data.ts`.
+No keys are needed. `npm run build` produces the production bundle; `npm run seed` checks that the 10 seed sites in `lib/data/seed.ts` keep unique, stable ids, and writes nothing.
+
+### Adapter modes
+
+Pages and the `/api/*` routes read data through `getAdapter()` in `lib/adapter.ts`. `ADAPTER_MODE=fake` (the default when unset) serves the seed sites and expands their stored day profiles offline, with a small built-in place list for `/new`. `ADAPTER_MODE=real` calls the Open-Meteo forecast, archive and geocoding APIs from the server and falls back to the seed profile if a call fails. The site page badge says which source is on screen. See `.env.example`.
 
 ## Routes
 
@@ -56,6 +60,7 @@ No environment variables are needed. `npm run build` produces the production bun
 - `/site/[slug]` the plan for one site: live hours, settings, shift slider, hour-by-hour strip
 - `/new` add a site from a place search and a date
 - `/about` the method, the thresholds in use, limits and sources
+- `/api/sites`, `/api/sites/[slug]`, `/api/hours`, `/api/places` JSON routes, all returning `{ ok, data, error, source }`
 
 ## What we would build next
 

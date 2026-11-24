@@ -76,6 +76,8 @@ All four are linked from the header nav in `components/site-header.tsx` (Sites, 
 
 ## 3. Mission (in order)
 
+Status after Phase 1: items 1 to 7 untouched.
+
 1. **Validate the WBGT engine (2 h).** Take three points from the OSHA Outdoor WBGT calculator (hot dry, hot humid, overcast). Add Vitest and `lib/heat.test.ts` that call `computeHeat` and assert within ±1°C. Fix any drift in `lib/heat.ts`. Put the table (inputs, OSHA value, Calidra value, gap) in the README. Done when the test passes and the table is honest, gaps included.
 2. **Wow moment polish (2 h).** On `/site/phoenix-desert-ridge-framing`, heavy, 6 crew, 2 new: dragging the slider from 07:00 to 05:00 must visibly roll the rest counter down and the gold "Best window" badge must update. Make the shift window on the hour strip a single outlined band that slides with Motion. Make sure the mismatch line (heat index "Caution" vs WBGT "stop") shows for at least one seeded site and is easy to spot. Rehearse it.
 3. **Kit signatures 2 and 3 (2 h).** As described above. Honor `prefers-reduced-motion`.
@@ -108,3 +110,76 @@ All four are linked from the header nav in `components/site-header.tsx` (Sites, 
 - The wow moment (slider, rolling counter, best window) is rehearsed and recorded.
 - README validation table filled with real numbers.
 - Devpost page complete with video, repo link and every team member's name; eligibility confirmed.
+
+---
+
+# Phase 1 handover: walking skeleton, adapter seam and demo contract
+
+## Goal
+
+Every step of the 90 second demo has a route that renders from seed data through `getAdapter()` and the `/api/*` handlers, with `ADAPTER_MODE=fake` as the default so the first deploy has no network dependency.
+
+## Status
+
+Done by reading and writing files only; nothing was built or run. Acceptance items, with evidence:
+
+- DEMO.md exists, start route `/` (`DEMO.md:11`); steps name `app/page.tsx`, `app/site/[slug]/page.tsx`, `app/new/page.tsx`, `app/about/page.tsx`, all present.
+- CLAUDE.md has the commands (`CLAUDE.md:5-10`), four Vercel guardrails (`CLAUDE.md` section "Vercel guardrails") and the compaction line (last line).
+- `lib/adapter.ts:22-24` exports `getAdapter()`, reads `process.env.ADAPTER_MODE`, returns fake unless it equals `"real"`. `lib/adapters/fake.ts` (`fakeAdapter: CalidraAdapter`) and `lib/adapters/real.ts` (`realAdapter: CalidraAdapter`) implement the interface.
+- `lib/data/seed.ts` holds the 10 seed sites byte for byte from the old `lib/data.ts`, no `Date.now` or `Math.random`; `scripts/seed.mjs` has neither; `package.json` `"seed": "node scripts/seed.mjs"`.
+- Four `loading.tsx` files: `app/loading.tsx`, `app/site/[slug]/loading.tsx`, `app/new/loading.tsx`, `app/about/loading.tsx`. Static blocks, no animation.
+- Empty states: `/` shows "No crew sites yet" if the adapter returns no sites (`app/page.tsx`), the collection shows "No site matches those filters." with a "Clear filters" button (`components/site-collection.tsx`), the site page shows "No hourly data for this site yet" when the plan is empty (`components/plan-view.tsx`).
+- Title template `"%s | Calidra"` (`app/layout.tsx:11`); `/` uses `title: { absolute: ... }` (`app/page.tsx`); `/new` exports `title: "Plan a site"`, `/about` exports `title: "Method"`. `app/icon.svg` untouched.
+- Active nav: `components/site-nav.tsx` (client, `usePathname`) sets `aria-current="page"` plus `bg-deep` and a gold underline; `/site/*` counts as Sites.
+- `app/error.tsx` names Calidra, has `reset()` retry and a link to `/`, shows no error text. `app/not-found.tsx` names Calidra and links to `/`.
+- API routes `app/api/sites/route.ts`, `app/api/sites/[slug]/route.ts`, `app/api/hours/route.ts`, `app/api/places/route.ts` import `getAdapter` and return `ApiResponse<T>` from `lib/types.ts`, status 200.
+- Grep for `fetchHourly|searchPlaces|seedHours` under `app/` and `components/` finds only the method call `adapter.searchPlaces(q)` in `app/api/places/route.ts:14`. Client imports from `@/lib/open-meteo` are the pure helpers `resolveDate` (`components/plan-view.tsx:31`) and `isoDate`, `pickEndpoint` (`components/new-site-form.tsx:11`).
+- No `useSearchParams` anywhere, so no Suspense boundary is needed. No runtime `fs` writes. `process.env` keys: `ADAPTER_MODE` (`lib/adapter.ts`), `NEXT_PUBLIC_BRAND_FILES` (`lib/brand-files.ts`), both in `.env.example`.
+- Wide elements: hour strip `min-w-[60rem]` sits in `overflow-x-auto` (`components/plan-view.tsx`), thresholds table `min-w-[34rem]` in an `overflow-x-auto` Card (`app/about/page.tsx`). No `w-[Npx]` containers.
+- `tsconfig.json:7` `"strict": true`; `.gitignore:4-5` has `.env*` and `!.env.example`.
+- SAMENESS TRIPWIRE greps over `app/`, `components/`, `lib/`: dead hex list, banned keyframes, `--delay|--d:`, `backdrop-blur`, em and en dash: no hits. `#[0-9a-fA-F]{6}` hits only `app/opengraph-image.tsx`, `app/globals.css` and `app/icon.svg` (brand file, never touched).
+
+Unverified (needs the runner): `npm run build`, `npm run seed` twice, the Vercel deploy, `/api/sites` JSON on the live URL.
+
+## Decisions
+
+- `CalidraAdapter` has a `mode: "fake" | "real"` field beyond the four methods so `/api/places` can report a source. Geocoding has no weather source, so real mode reports `"forecast"` there.
+- Fake `getHours` uses the site's own profile or snapshot when present. For a place with no seed (from `/new`), it borrows the nearest seed site's day profile on the requested date, so `/new` works offline. Its result says `source: "seed"` and the saved site note says "nearest seed day profile (offline mode)".
+- Real `getHours` falls back to fake on any throw and then reports `"seed"`, so the badge stays honest.
+- `PlanView` takes `initialSource` from the server render, so the badge reads "Source: seed day profile" from the first paint and with JavaScript off. It then refreshes once from `/api/hours` (date resolved in the browser with `resolveDate`). Sites made on `/new` keep their saved snapshot and show "Hours saved with this site" instead of refetching.
+- `LiveStripCell` now takes `hours` as a prop from the server page instead of calling `seedHours` itself; the collection uses each local site's `snapshot`.
+- The active nav moved into a new client file `components/site-nav.tsx` so `site-header.tsx` and `BrandMark` stay server components. Still one brand mark in the brand link.
+- The collection empty state keeps its "Clear filters" button (it resets state and rewrites the URL to `/`) instead of a plain link, because a link to `/` would not reset the client filter state.
+- Two copy lines changed because they became untrue: the collection footnote (`components/site-collection.tsx`) and the data note on `/new` (`app/new/page.tsx`), which now says requests go through this site's server.
+- `.env.example` lists `# NEXT_PUBLIC_BRAND_FILES=` commented out, since `next.config.ts` sets it at build time.
+- `scripts/seed.mjs` checks `slug:` values (the site ids) and any `id:` values; the seed has no `id:` field today.
+
+## Failed attempts
+
+None.
+
+## Files changed
+
+New: `lib/types.ts`, `lib/data/seed.ts`, `lib/adapter.ts`, `lib/adapters/fake.ts`, `lib/adapters/real.ts`, `scripts/seed.mjs`, `app/api/sites/route.ts`, `app/api/sites/[slug]/route.ts`, `app/api/hours/route.ts`, `app/api/places/route.ts`, `app/loading.tsx`, `app/site/[slug]/loading.tsx`, `app/new/loading.tsx`, `app/about/loading.tsx`, `components/site-nav.tsx`, `DEMO.md`, `CLAUDE.md`.
+
+Edited: `lib/data.ts`, `lib/open-meteo.ts`, `package.json`, `.env.example`, `app/page.tsx`, `app/site/[slug]/page.tsx`, `app/layout.tsx`, `app/new/page.tsx`, `app/error.tsx`, `app/not-found.tsx`, `components/plan-view.tsx`, `components/new-site-form.tsx`, `components/site-collection.tsx`, `components/live-strip-cell.tsx`, `components/site-header.tsx`, `README.md`, `HANDOFF.md`.
+
+## Commands run
+
+None, agent has no shell.
+
+## Open questions
+
+- README "How it uses the required tech" still says the Open-Meteo APIs are "called for real from the first commit". True in real mode, dormant in the default fake mode. Rewrite once Phase 2 switches the deploy to real.
+- In real mode `/` calls Open-Meteo once per seed site (10 calls) on every request because the page reads `searchParams`. Phase 2 should cache (`next: { revalidate }`) or keep the collection on seed profiles.
+- The `/new` page intro still says Calidra "pulls 24 hours ... from Open-Meteo"; in fake mode the hours come from the nearest seed profile. The saved note and badge say so.
+- In fake mode the Cuiabá date badge flips from "Tomorrow" to 25 Nov 2026 (the fixed `profileDate`) after the client refresh.
+- Not verified that the Phoenix seed shows a heat index "Caution" hour that WBGT calls "stop" (wow moment); that is Mission item 2.
+- No new dependency, no `Site` schema change, no new page route, no env variable beyond `ADAPTER_MODE`.
+- Builder checklist, manual: confirm eligibility (students only, above the age of majority) and add every team member's name to Devpost.
+
+## Next best step
+
+Phase 2: set up `.farm-live.json`, switch the deploy to `ADAPTER_MODE=real`, add the WBGT validation tests (Vitest, three OSHA points at ±1°C), and add `npm run proof`.
+
+Closing commit message: `faz-1: walking skeleton, adapter seam and demo contract`.
