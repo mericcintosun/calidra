@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { animate, useReducedMotion } from "motion/react";
+import { LayoutGroup, animate, motion, useReducedMotion } from "motion/react";
 import { CloudSun, Printer, Wind } from "lucide-react";
 import { Legend } from "@/components/live-strip-cell";
+import { SceneSlot } from "@/components/scene-slot";
+import { SITES_LAYOUT_GROUP, SiteFigures } from "@/components/site-figures";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,6 +31,7 @@ import {
   planDay,
   resolveDate,
   shiftTotals,
+  summarizeSite,
   type HourPlan,
 } from "@/lib/heat";
 import { applyPlanParams, parsePlanParams, toPlanQuery, type PlanOverrides } from "@/lib/plan-params";
@@ -99,6 +102,9 @@ export function PlanView({
   );
   const [s, setS] = useState<PlanSettings>(() => applyPlanParams(site, overrides));
   const [selected, setSelected] = useState<number>(13);
+  // The hour under the pointer or keyboard focus, and where its breakdown popover sits.
+  const [peek, setPeek] = useState<{ hour: number; left: number } | null>(null);
+  const stripWrap = useRef<HTMLDivElement>(null);
   // Bumped by the "Retry live hours" button; any value above 0 forces one more request.
   const [retry, setRetry] = useState(0);
   const query = toPlanQuery(s);
@@ -140,6 +146,10 @@ export function PlanView({
     // Site fields are listed one by one so a new object for the same place does not refetch.
   }, [site.slug, site.lat, site.lon, site.date, hasSnapshot, mode, initialSource, initialDate, retry]);
 
+  const reduce = useReducedMotion();
+  // The same summary the collection row shows (summarizeSite at the site's own settings), so the
+  // figure block the row morphs from carries identical numbers here.
+  const summary = useMemo(() => summarizeSite(site, hours), [site, hours]);
   const heat = useMemo(() => computeHeat(hours, site.lat, site.lon), [hours, site.lat, site.lon]);
   const plan = useMemo(() => planDay(heat, s), [heat, s]);
   const totals = shiftTotals(plan, s);
@@ -153,20 +163,48 @@ export function PlanView({
     setRetry((n) => n + 1);
   };
   const focus = plan.find((h) => h.hour === selected) ?? plan[0];
+  const peekPlan = peek ? plan.find((h) => h.hour === peek.hour) : undefined;
+  // Centers the breakdown over the hovered or focused column, kept inside the strip's box.
+  const peekAt = (hour: number, el: HTMLElement) => {
+    const wrap = stripWrap.current;
+    if (!wrap) return;
+    const box = wrap.getBoundingClientRect();
+    const col = el.getBoundingClientRect();
+    const half = BREAKDOWN_HALF_PX;
+    const center = col.left + col.width / 2 - box.left;
+    setPeek({ hour, left: Math.min(Math.max(center, half), Math.max(half, box.width - half)) });
+  };
   const maxStart = 24 - s.shiftHours;
   const set = (patch: Partial<PlanSettings>) => setS((prev) => ({ ...prev, ...patch }));
   const newCount = Math.min(s.newWorkers, s.crewSize);
 
   return (
-    <div className="space-y-6">
-      <div className="calidra-drop flex flex-col gap-3">
-        <p className="break-words text-sm font-semibold text-gold" title={`${site.trade}, ${site.city}, ${site.region}, ${site.country}`}>
+    <div className="calidra-drop-group space-y-6">
+      <LayoutGroup id={SITES_LAYOUT_GROUP}>
+      <div className="flex flex-col gap-3">
+        <p
+          className="flex items-center gap-2 break-words text-sm font-semibold text-muted-foreground"
+          title={`${site.trade}, ${site.city}, ${site.region}, ${site.country}`}
+        >
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-gold" />
           {site.trade} · {site.city}, {site.region}, {site.country}
         </p>
-        <h1 className="break-words text-4xl font-bold leading-tight sm:text-5xl" title={site.name}>
+        {/* Kit K7 signature 2: the same layoutIds as the collection row's name and figure block. */}
+        <motion.h1
+          layoutId={reduce ? undefined : `site-${site.slug}-name`}
+          className="break-words text-4xl font-bold leading-tight sm:text-5xl"
+          title={site.name}
+        >
           {site.name}
-        </h1>
+        </motion.h1>
         <p className="max-w-[70ch] break-words text-muted-foreground">{site.note}</p>
+        <motion.div layoutId={reduce ? undefined : `site-${site.slug}-figure`} className="max-w-2xl">
+          <SiteFigures row={summary} size="lg" />
+        </motion.div>
+        <p className="text-xs text-muted-foreground">
+          Figures above use the site&apos;s saved plan: crew of {site.crewSize}, start {hourLabel(site.shiftStart)}. The counter
+          below follows your settings.
+        </p>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="secondary">{load.kind === "live" ? formatSiteDate(load.date) : formatSiteDate(site.date)}</Badge>
           <SourceBadge load={load} />
@@ -189,6 +227,7 @@ export function PlanView({
           </div>
         )}
       </div>
+      </LayoutGroup>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <Card tone="glow" className="flex flex-col gap-5 p-6">
@@ -247,6 +286,7 @@ export function PlanView({
           )}
         </Card>
 
+        <div className="flex flex-col gap-4">
         <Card tone="deep" className="flex flex-col gap-4 p-6">
           <SettingGroup label="Workload">
             {WORKLOAD_KEYS.map((k) => (
@@ -305,6 +345,15 @@ export function PlanView({
             ))}
           </SettingGroup>
         </Card>
+        <Card className="overflow-hidden p-0">
+          <SceneSlot
+            n={4}
+            alt="A sun disc sliding along a track above a row of hour blocks, with a gold outlined shift window moving from midday toward dawn"
+            width={880}
+            height={440}
+          />
+        </Card>
+        </div>
       </div>
 
       <Card className="space-y-4 p-5">
@@ -312,19 +361,26 @@ export function PlanView({
           <h2 className="text-2xl font-semibold">Hour by hour</h2>
           <Legend />
         </div>
-        <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[60rem] grid-cols-24 gap-1">
-            {plan.map((h) => (
-              <HourColumn
-                key={h.hour}
-                h={h}
-                inShift={h.hour >= s.shiftStart && h.hour < s.shiftStart + s.shiftHours}
-                selected={h.hour === selected}
-                showNew={newCount > 0}
-                onSelect={() => setSelected(h.hour)}
-              />
-            ))}
+        {/* The breakdown popover sits outside the scroll box so it is never clipped. */}
+        <div ref={stripWrap} className="relative" onMouseLeave={() => setPeek(null)}>
+          <div className="overflow-x-auto pb-2">
+            <div className="grid min-w-[60rem] grid-cols-24 gap-1">
+              {plan.map((h) => (
+                <HourColumn
+                  key={h.hour}
+                  h={h}
+                  inShift={h.hour >= s.shiftStart && h.hour < s.shiftStart + s.shiftHours}
+                  selected={h.hour === selected}
+                  showNew={newCount > 0}
+                  describedBy={peek?.hour === h.hour ? BREAKDOWN_ID : undefined}
+                  onSelect={() => setSelected(h.hour)}
+                  onPeek={(el) => peekAt(h.hour, el)}
+                  onUnpeek={() => setPeek(null)}
+                />
+              ))}
+            </div>
           </div>
+          {peek && peekPlan && <HourBreakdown h={peekPlan} left={peek.left} newCount={newCount} />}
         </div>
         {plan.length === 0 && (
           <EmptyState
@@ -340,32 +396,49 @@ export function PlanView({
   );
 }
 
+const BREAKDOWN_ID = "hour-breakdown";
+/** Half the popover width (w-68 is 17rem, 272 px). */
+const BREAKDOWN_HALF_PX = 136;
+
 function HourColumn({
   h,
   inShift,
   selected,
   showNew,
+  describedBy,
   onSelect,
+  onPeek,
+  onUnpeek,
 }: {
   h: HourPlan;
   inShift: boolean;
   selected: boolean;
   showNew: boolean;
+  describedBy?: string;
   onSelect: () => void;
+  onPeek: (el: HTMLElement) => void;
+  onUnpeek: () => void;
 }) {
   return (
     <Button
       type="button"
       variant="ghost"
       aria-pressed={selected}
+      aria-describedby={describedBy}
       onClick={onSelect}
+      onMouseEnter={(e) => onPeek(e.currentTarget)}
+      onFocus={(e) => onPeek(e.currentTarget)}
+      onBlur={onUnpeek}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onUnpeek();
+      }}
       aria-label={`${hourLabel(h.hour)}: WBGT ${h.wbgtC} degrees, ${STATUS_LABEL[h.status]}`}
       className={cn(
         "flex h-auto flex-col items-stretch gap-1 rounded-xl px-0.5 py-1.5 text-[11px] font-medium",
         inShift ? "bg-deep" : "opacity-55"
       )}
     >
-      <span className="text-center text-muted-foreground">{String(h.hour).padStart(2, "0")}</span>
+      <span className="text-center text-[11px] leading-none text-muted-foreground">{hourLabel(h.hour).slice(0, 2)}</span>
       <span className="text-center font-display text-sm font-semibold">{Math.round(h.wbgtC)}°</span>
       <span className={cn("flex h-9 items-center justify-center rounded-lg text-background", STATUS_FILL[h.status])}>
         {h.workMin}/{60 - h.workMin}
@@ -376,6 +449,46 @@ function HourColumn({
         </span>
       )}
     </Button>
+  );
+}
+
+/**
+ * Hover and focus breakdown for one hour: every number is a field of the engine's HourPlan
+ * (computeHeat then planDay in lib/heat.ts), never typed in. Opens on pointer hover or keyboard
+ * focus, closes on leave, blur or Escape; the focused column points at it with aria-describedby.
+ */
+function HourBreakdown({ h, left, newCount }: { h: HourPlan; left: number; newCount: number }) {
+  const rows: [string, string][] = [
+    ["Air temperature", `${h.tempC}°C`],
+    ["Humidity", `${Math.round(h.rh)}%`],
+    ["Sunlight", `${Math.round(h.solarWm2)} W/m²`],
+    ["Wind at 2 m", `${h.wind2m.toFixed(1)} m/s`],
+    ["Heat index", `${h.heatIndexC}°C, ${h.hiBand.toLowerCase()}`],
+    ["Sun WBGT", `${h.wbgtC}°C`],
+    ["Veterans", `work ${h.workMin}, rest ${60 - h.workMin} min`],
+  ];
+  if (newCount > 0) rows.push(["New workers", `work ${h.newWorkMin}, rest ${60 - h.newWorkMin} min`]);
+  return (
+    <Card
+      tone="deep"
+      id={BREAKDOWN_ID}
+      role="tooltip"
+      className="pointer-events-none absolute bottom-full z-20 mb-2 w-68 -translate-x-1/2 space-y-2 p-4 text-sm"
+      style={{ left }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-display text-base font-semibold">{hourLabel(h.hour)}</p>
+        <Badge variant={h.status === "work" ? "ok" : h.status === "pace" ? "warn" : "bad"}>{STATUS_LABEL[h.status]}</Badge>
+      </div>
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="text-right tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }
 
