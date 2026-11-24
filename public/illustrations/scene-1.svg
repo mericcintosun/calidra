@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640">
+  <defs>
+    <radialGradient id="sun" cx="0.72" cy="0.62" r="0.55">
+      <stop offset="0" stop-color="#b78df2" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#171020" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="960" height="640" fill="#171020"/>
+  <rect width="960" height="640" fill="url(#sun)"/>
+  <circle cx="690" cy="420" r="70" fill="#e0b84e"/>
+  <path d="M0 430 C160 400 300 410 420 430 S700 450 960 420 V640 H0 Z" fill="#291d35"/>
+  <path d="M0 480 C200 470 420 490 960 470 V640 H0 Z" fill="#1f1629"/>
+  <g fill="none" stroke="#3a2a4b" stroke-width="10" stroke-linecap="round">
+    <path d="M540 470 V250 M600 470 V250 M660 470 V300 M720 470 V300 M520 250 H760"/>
+    <path d="M540 330 L600 270 M600 330 L660 270"/>
+  </g>
+  <path d="M90 300 L330 270 L360 310 L120 340 Z" fill="#b78df2"/>
+  <g stroke="#f0eaf6" stroke-width="6" stroke-linecap="round">
+    <line x1="120" y1="336" x2="120" y2="500"/>
+    <line x1="350" y1="308" x2="350" y2="500"/>
+  </g>
+  <g fill="#f0eaf6">
+    <circle cx="170" cy="420" r="18"/>
+    <rect x="152" y="440" width="36" height="60" rx="14"/>
+    <circle cx="240" cy="428" r="18"/>
+    <rect x="222" y="448" width="36" height="52" rx="14"/>
+    <circle cx="300" cy="420" r="18"/>
+    <rect x="282" y="440" width="36" height="60" rx="14"/>
+  </g>
+  <rect x="200" y="470" width="80" height="30" rx="8" fill="#69a56f"/>
+  <g>
+    <line x1="430" y1="500" x2="410" y2="560" stroke="#f0eaf6" stroke-width="5" stroke-linecap="round"/>
+    <line x1="430" y1="500" x2="450" y2="560" stroke="#f0eaf6" stroke-width="5" stroke-linecap="round"/>
+    <line x1="430" y1="500" x2="430" y2="420" stroke="#f0eaf6" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="430" cy="400" r="24" fill="#171020" stroke="#b78df2" stroke-width="5"/>
+  </g>
+  <g fill="#e0b84e" opacity="0.8">
+    <rect x="40" y="580" width="40" height="10" rx="5"/>
+    <rect x="90" y="580" width="40" height="10" rx="5"/>
+  </g>
+  <g>
+    <rect x="140" y="580" width="40" height="10" rx="5" fill="#69a56f"/>
+    <rect x="190" y="580" width="40" height="10" rx="5" fill="#e0b84e"/>
+    <rect x="240" y="580" width="40" height="10" rx="5" fill="#ef6a5a"/>
+  </g>
+</svg>
