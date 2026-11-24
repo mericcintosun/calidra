@@ -315,6 +315,30 @@ export function findMismatch(plan: HourPlan[]): HourPlan | undefined {
   return plan.find((h) => (h.hiBand === "Below caution" || h.hiBand === "Caution") && (h.status === "rest" || h.status === "stop"));
 }
 
+const BAND_RANK: Record<HeatIndexBand, number> = {
+  "Below caution": 0,
+  Caution: 1,
+  "Extreme caution": 2,
+  Danger: 3,
+  "Extreme danger": 4,
+};
+
+/**
+ * Among hours where sun WBGT says rest or stop, the one whose heat index reads the lowest band
+ * (earliest hour on ties). On days with no "Caution" hour, this still shows the gap between
+ * the shade number and the sun verdict, for example "Extreme caution" against "stop".
+ */
+export function findBandGap(plan: HourPlan[]): HourPlan | undefined {
+  let best: HourPlan | undefined;
+  for (const h of plan) {
+    if (h.status !== "rest" && h.status !== "stop") continue;
+    if (!best || BAND_RANK[h.hiBand] < BAND_RANK[best.hiBand] || (BAND_RANK[h.hiBand] === BAND_RANK[best.hiBand] && h.hour < best.hour)) {
+      best = h;
+    }
+  }
+  return best;
+}
+
 /* ---------- collection summaries ---------- */
 export interface SiteSummary {
   slug: string;

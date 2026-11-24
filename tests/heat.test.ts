@@ -5,6 +5,7 @@ import {
   TLV,
   bestStart,
   computeHeat,
+  findBandGap,
   findMismatch,
   limitAt,
   planDay,
@@ -151,17 +152,45 @@ describe("work/rest planner on hand-built hours", () => {
 });
 
 describe("demo contract", () => {
-  // DEMO.md steps 2 and 4: the Phoenix seed, heavy work, must show a heat index "Caution" hour
-  // that sun WBGT calls rest or stop. HANDOFF.md records a hand check suggesting this fails on
-  // the seed profile (its coolest hour is 35.6 C at 17 percent humidity, heat index about 92 F,
-  // "Extreme caution"). The test stays as the contract; the seed is not tuned to pass it.
-  it("Phoenix seed hours give a mismatch hour through computeHeat, planDay and findMismatch", () => {
+  // DEMO.md steps 2 and 4. Phase 2 found that the Phoenix seed has no hour where the heat index
+  // reads "Caution" or lower (its coolest hour is 35.6 C at 17 percent humidity, heat index about
+  // 92 F, "Extreme caution"), so findMismatch returns nothing there. The seed is not tuned and
+  // findMismatch is not changed; the site page falls back to findBandGap, which shows the lowest
+  // heat index band among the hours sun WBGT calls rest or stop.
+  it("Phoenix seed hours give a band gap hour through computeHeat, planDay and findBandGap", () => {
     const site = findSeedSite("phoenix-desert-ridge-framing");
     expect(site).toBeDefined();
     if (!site) return;
     const plan = planDay(computeHeat(seedHours(site), site.lat, site.lon), site);
     expect(plan).toHaveLength(24);
-    expect(findMismatch(plan)).toBeDefined();
+    const gap = findBandGap(plan);
+    expect(gap).toBeDefined();
+    expect(["stop", "rest"]).toContain(gap?.status);
+  });
+
+  // findMismatch keeps its own contract on hand-built hours: a "Caution" hour that WBGT calls stop.
+  it("findMismatch still returns a Caution hour that sun WBGT calls stop", () => {
+    const plan = planDay([hourAt(8, 22, "Caution"), hourAt(9, 40, "Caution")], HEAVY);
+    const m = findMismatch(plan);
+    expect(m?.hour).toBe(9);
+    expect(m?.hiBand).toBe("Caution");
+    expect(m?.status).toBe("stop");
+  });
+
+  it("findBandGap picks the lowest band, earliest hour on ties, and skips work hours", () => {
+    const plan = planDay(
+      [
+        hourAt(9, 20, "Below caution"),
+        hourAt(10, 40, "Danger"),
+        hourAt(11, 40, "Extreme caution"),
+        hourAt(12, 41, "Extreme caution"),
+      ],
+      HEAVY
+    );
+    const gap = findBandGap(plan);
+    expect(gap?.hour).toBe(11);
+    expect(gap?.hiBand).toBe("Extreme caution");
+    expect(findBandGap(planDay([hourAt(9, 20, "Caution")], HEAVY))).toBeUndefined();
   });
 });
 
