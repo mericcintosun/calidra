@@ -7,20 +7,49 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { WORKLOADS, WORKLOAD_KEYS, hourLabel } from "@/lib/heat";
-import { isoDate, pickEndpoint } from "@/lib/open-meteo";
+import { hintFor, type ApiError } from "@/lib/errors";
+import { WORKLOADS, WORKLOAD_KEYS, hourLabel, isoDate } from "@/lib/heat";
 import { saveLocalSite, slugify } from "@/lib/site-store";
 import type { ApiResponse, HourlyResult, Place, Site, Workload } from "@/lib/types";
 
 type Status = { kind: "idle" } | { kind: "busy"; message: string } | { kind: "error"; message: string };
 
-/** GET an /api/* route and unwrap the shared ApiResponse shape. */
-async function getApi<T>(url: string): Promise<{ data: T; source: ApiResponse<T>["source"] }> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Request answered ${res.status}`);
-  const body = (await res.json()) as ApiResponse<T>;
-  if (!body.ok || body.data === null) throw new Error(body.error ?? "No data returned");
-  return { data: body.data, source: body.source };
+type ApiOutcome<T> = { ok: true; data: T; source: ApiResponse<T>["source"] } | { ok: false; error: ApiError };
+
+/** GET an /api/* route and unwrap the shared ApiResponse shape; failures come back as a typed code. */
+async function getApi<T>(url: string): Promise<ApiOutcome<T>> {
+  let body: ApiResponse<T> | null = null;
+  try {
+    const res = await fetch(url);
+    body = (await res.json()) as ApiResponse<T>;
+  } catch {
+    body = null;
+  }
+  if (!body) return { ok: false, error: { error: "upstream_error", hint: hintFor("upstream_error") } };
+  if (!body.ok || body.data === null) {
+    return { ok: false, error: body.error ?? { error: "parse_failure", hint: hintFor("parse_failure") } };
+  }
+  return { ok: true, data: body.data, source: body.source };
+}
+
+/** What to tell the lead when the place search fails, by error code. */
+function placeErrorMessage(error: ApiError): string {
+  switch (error.error) {
+    case "invalid_input":
+      return "Type 2 to 80 characters of a town or city name.";
+    default:
+      return error.hint;
+  }
+}
+
+/** What to tell the lead when fetching hours fails, by error code. */
+function hoursErrorMessage(error: ApiError): string {
+  switch (error.error) {
+    case "invalid_input":
+      return "Pick a date between 1 Jan 1950 and 15 days from today.";
+    default:
+      return error.hint;
+  }
 }
 
 const SOURCE_NOTE: Record<HourlyResult["source"], string> = {
@@ -54,13 +83,13 @@ export function NewSiteForm() {
   async function find(q = query) {
     if (q.trim().length < 2) return;
     setStatus({ kind: "busy", message: "Searching places…" });
-    try {
-      const { data: found } = await getApi<Place[]>(`/api/places?q=${encodeURIComponent(q.trim())}`);
-      setPlaces(found);
-      setStatus(found.length ? { kind: "idle" } : { kind: "error", message: `No place called "${q}" found. Try a nearby city.` });
-    } catch (e) {
-      setStatus({ kind: "error", message: e instanceof Error ? e.message : "Place search failed" });
+    const r = await getApi<Place[]>(`/api/places?q=${encodeURIComponent(q.trim())}`);
+    if (!r.ok) {
+      setStatus({ kind: "error", message: placeErrorMessage(r.error) });
+      return;
     }
+    setPlaces(r.data);
+    setStatus(r.data.length ? { kind: "idle" } : { kind: "error", message: `No place called "${q}" found. Try a nearby city.` });
   }
 
   function presetPhoenix() {
@@ -82,9 +111,14 @@ export function NewSiteForm() {
       return;
     }
     setStatus({ kind: "busy", message: `Fetching 24 hours for ${place.name}…` });
+    const qs = new URLSearchParams({ lat: String(place.latitude), lon: String(place.longitude), date });
+    const outcome = await getApi<HourlyResult>(`/api/hours?${qs.toString()}`);
+    if (!outcome.ok) {
+      setStatus({ kind: "error", message: hoursErrorMessage(outcome.error) });
+      return;
+    }
     try {
-      const qs = new URLSearchParams({ lat: String(place.latitude), lon: String(place.longitude), date });
-      const { data: r } = await getApi<HourlyResult>(`/api/hours?${qs.toString()}`);
+      const r = outcome.data;
       if (r.hours.length === 0) throw new Error("No hourly data for that place and date");
       const offsetHours = Math.round(((r.hours[0].utcMs - Date.UTC(...ymdh(r.hours[0].local))) / -3600000) * 2) / 2;
       const crewName = name.trim() || `${place.name} crew`;
@@ -100,7 +134,8 @@ export function NewSiteForm() {
         utcOffsetHours: offsetHours,
         date: r.date,
         profileDate: r.date,
-        mode: r.source === "seed" ? pickEndpoint(r.date) : r.source,
+        // Sample hours have no endpoint; a past date files under past heat days, today or later under forecast.
+        mode: r.source === "seed" ? (r.date < isoDate(new Date()) ? "archive" : "forecast") : r.source,
         workload,
         clothing: "workClothes",
         crewSize,

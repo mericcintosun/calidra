@@ -370,6 +370,19 @@ export function formatSiteDate(date: string): string {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
+/** YYYY-MM-DD in the local calendar of whoever runs this (browser or server). */
+export function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Turns "tomorrow" into a YYYY-MM-DD date; any other value passes through. */
+export function resolveDate(date: string): string {
+  if (date !== "tomorrow") return date;
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return isoDate(d);
+}
+
 export function hourLabel(h: number): string {
   return `${String(((h % 24) + 24) % 24).padStart(2, "0")}:00`;
 }

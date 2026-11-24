@@ -22,6 +22,9 @@ export default async function Home({
   const initial = parseFilters(await searchParams);
   const adapter = getAdapter();
   const sites = await adapter.listSites();
+  // Real mode: one Open-Meteo call per site, served from the Next.js data cache
+  // (30 min for forecast days, 24 h for archive days, set in lib/config.ts), so repeat
+  // visits and filter changes do not hit Open-Meteo again. Failures fall back to seed.
   const results = await Promise.all(sites.map((s) => adapter.getHours(s, s.date)));
   const summaries = sites.map((s, i) => summarizeSite(s, results[i].hours));
 

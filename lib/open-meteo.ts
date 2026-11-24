@@ -1,66 +1,57 @@
-// Open-Meteo clients. All three APIs are keyless. lib/adapters/real.ts calls them on the
-// server behind /api/hours and /api/places when ADAPTER_MODE=real:
-//   Forecast   https://api.open-meteo.com/v1/forecast
-//   Historical https://archive-api.open-meteo.com/v1/archive
-//   Geocoding  https://geocoding-api.open-meteo.com/v1/search
-// seedHours() is the offline path: it expands a site's stored daily profile into 24 hours so
-// every page renders with JavaScript off or when the network fails. The UI says which one it shows.
+// Open-Meteo clients, server only. All three APIs are keyless; their URLs live in lib/config.ts.
+// lib/adapters/real.ts calls them behind /api/hours and /api/places when ADAPTER_MODE=real.
+// Every request goes through fetchJson() (timeout, one retry) and every answer through a zod
+// schema; a schema miss is a parse_failure. seedHours() is the offline path: it expands a site's
+// stored daily profile into 24 hours. Client components import date helpers from lib/heat.ts,
+// never from this file.
 
+import {
+  ARCHIVE_LAG_DAYS,
+  ARCHIVE_REVALIDATE_S,
+  FORECAST_REVALIDATE_S,
+  GEOCODING_REVALIDATE_S,
+  LOG_PREFIX,
+  MIN_COMPLETE_HOURS,
+  OPEN_METEO_ARCHIVE_URL,
+  OPEN_METEO_FORECAST_URL,
+  OPEN_METEO_GEOCODING_URL,
+  OPEN_METEO_HOURLY_VARS,
+  PLACE_RESULT_COUNT,
+} from "./config";
+import { CalidraError } from "./errors";
+import { cosZenith, resolveDate } from "./heat";
+import { fetchJson } from "./http";
+import { openMeteoGeocodeSchema, openMeteoHourlySchema } from "./schemas";
 import type { HourlyResult, HourlyWeather, Place, Site, WeatherSource } from "./types";
-import { cosZenith } from "./heat";
 
 export type { HourlyResult, Place, WeatherSource } from "./types";
-
-const HOURLY = "temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m,cloud_cover,surface_pressure";
-
-interface OpenMeteoHourly {
-  utc_offset_seconds: number;
-  timezone: string;
-  hourly?: {
-    time: string[];
-    temperature_2m: (number | null)[];
-    relative_humidity_2m: (number | null)[];
-    shortwave_radiation: (number | null)[];
-    wind_speed_10m: (number | null)[];
-    cloud_cover: (number | null)[];
-    surface_pressure: (number | null)[];
-  };
-  reason?: string;
-}
-
-/** YYYY-MM-DD in the browser's calendar. */
-export function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-export function resolveDate(date: string): string {
-  if (date !== "tomorrow") return date;
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return isoDate(d);
-}
+export { isoDate, resolveDate } from "./heat";
 
 /** The archive lags real time by about five days; anything newer goes to the forecast API. */
 export function pickEndpoint(date: string): Exclude<WeatherSource, "seed"> {
   const days = (Date.parse(`${date}T12:00:00Z`) - Date.now()) / 86400000;
-  return days < -6 ? "archive" : "forecast";
+  return days < -ARCHIVE_LAG_DAYS ? "archive" : "forecast";
 }
 
-export async function fetchHourly(lat: number, lon: number, dateIn: string, signal?: AbortSignal): Promise<HourlyResult> {
+export async function fetchHourly(lat: number, lon: number, dateIn: string): Promise<HourlyResult> {
   const date = resolveDate(dateIn);
   const source = pickEndpoint(date);
-  const base = source === "archive" ? "https://archive-api.open-meteo.com/v1/archive" : "https://api.open-meteo.com/v1/forecast";
+  const base = source === "archive" ? OPEN_METEO_ARCHIVE_URL : OPEN_METEO_FORECAST_URL;
   const url =
     `${base}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
-    `&start_date=${date}&end_date=${date}&hourly=${HOURLY}&wind_speed_unit=ms&timezone=auto`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { reason?: string };
-    throw new Error(body.reason ?? `Open-Meteo ${source} answered ${res.status}`);
+    `&start_date=${date}&end_date=${date}&hourly=${OPEN_METEO_HOURLY_VARS}&wind_speed_unit=ms&timezone=auto`;
+
+  const raw = await fetchJson(url, {
+    revalidate: source === "archive" ? ARCHIVE_REVALIDATE_S : FORECAST_REVALIDATE_S,
+  });
+  const parsed = openMeteoHourlySchema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn(`${LOG_PREFIX} hours parse fail source=${source} issues=${parsed.error.issues.length}`);
+    throw new CalidraError("parse_failure", "hourly payload did not match the schema");
   }
-  const json = (await res.json()) as OpenMeteoHourly;
+
+  const json = parsed.data;
   const h = json.hourly;
-  if (!h || h.time.length === 0) throw new Error("Open-Meteo returned no hourly data for that date");
   const hours: HourlyWeather[] = [];
   for (let i = 0; i < h.time.length; i++) {
     const temp = h.temperature_2m[i];
@@ -81,16 +72,36 @@ export async function fetchHourly(lat: number, lon: number, dateIn: string, sign
       pressureHpa: h.surface_pressure[i] ?? 1013.25,
     });
   }
-  if (hours.length < 12) throw new Error("Open-Meteo returned too few complete hours for that date");
+  if (hours.length < MIN_COMPLETE_HOURS) {
+    console.warn(`${LOG_PREFIX} hours too few source=${source} complete=${hours.length}`);
+    throw new CalidraError("parse_failure", "too few complete hours");
+  }
+  console.info(`${LOG_PREFIX} hours ok source=${source} complete=${hours.length}`);
   return { hours, source, date, timezone: json.timezone };
 }
 
-export async function searchPlaces(name: string, signal?: AbortSignal): Promise<Place[]> {
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=6&language=en&format=json`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Place search answered ${res.status}`);
-  const json = (await res.json()) as { results?: Place[] };
-  return json.results ?? [];
+export async function searchPlaces(name: string): Promise<Place[]> {
+  const url =
+    `${OPEN_METEO_GEOCODING_URL}?name=${encodeURIComponent(name)}` +
+    `&count=${PLACE_RESULT_COUNT}&language=en&format=json`;
+  const raw = await fetchJson(url, { revalidate: GEOCODING_REVALIDATE_S });
+  const parsed = openMeteoGeocodeSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn(`${LOG_PREFIX} places parse fail issues=${parsed.error.issues.length}`);
+    throw new CalidraError("parse_failure", "geocoding payload did not match the schema");
+  }
+  const places: Place[] = (parsed.data.results ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    admin1: r.admin1,
+    country: r.country ?? "",
+    latitude: r.latitude,
+    longitude: r.longitude,
+    timezone: r.timezone ?? "auto",
+    elevation: r.elevation,
+  }));
+  console.info(`${LOG_PREFIX} places ok qlen=${name.length} results=${places.length}`);
+  return places;
 }
 
 /* ---------- offline seed profile ---------- */
