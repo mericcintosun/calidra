@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { CollectionFilters, SortKey } from "@/lib/data";
 import { STATUS_FILL, WORKLOADS, WORKLOAD_KEYS, hourLabel, summarizeSite, type SiteSummary } from "@/lib/heat";
-import { seedHours } from "@/lib/open-meteo";
 import { loadLocalSites } from "@/lib/site-store";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +30,8 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
   const [listRef] = useAutoAnimate<HTMLUListElement>({ duration: 320, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" });
 
   useEffect(() => {
-    setLocal(loadLocalSites().map((s) => summarizeSite(s, seedHours(s))));
+    // Sites made on /new carry the hours saved when they were created.
+    setLocal(loadLocalSites().map((s) => summarizeSite(s, s.snapshot ?? [])));
   }, []);
 
   function update(next: Partial<CollectionFilters>) {
@@ -118,8 +118,8 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
         )}
       </ul>
       <p className="max-w-[70ch] text-xs text-muted-foreground">
-        Row figures come from each site&apos;s stored day profile, run through the same WBGT engine. Open a site to load
-        its live Open-Meteo hours.
+        Row figures run each site&apos;s hours through the same WBGT engine as the site page. Open a site for the full
+        hour-by-hour plan; its badge says whether the hours are seed data or live Open-Meteo.
       </p>
     </div>
   );

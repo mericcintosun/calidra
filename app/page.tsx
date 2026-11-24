@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { LiveStripCell } from "@/components/live-strip-cell";
@@ -5,9 +6,13 @@ import { SceneSlot } from "@/components/scene-slot";
 import { SiteCollection } from "@/components/site-collection";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { parseFilters, sites } from "@/lib/data";
+import { getAdapter } from "@/lib/adapter";
+import { parseFilters } from "@/lib/data";
 import { hourLabel, summarizeSite } from "@/lib/heat";
-import { seedHours } from "@/lib/open-meteo";
+
+export const metadata: Metadata = {
+  title: { absolute: "Calidra: sun WBGT work/rest plans for outdoor crews" },
+};
 
 export default async function Home({
   searchParams,
@@ -15,8 +20,25 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const initial = parseFilters(await searchParams);
-  const summaries = sites.map((s) => summarizeSite(s, seedHours(s)));
+  const adapter = getAdapter();
+  const sites = await adapter.listSites();
+  const results = await Promise.all(sites.map((s) => adapter.getHours(s, s.date)));
+  const summaries = sites.map((s, i) => summarizeSite(s, results[i].hours));
+
+  if (sites.length === 0) {
+    return (
+      <Card className="flex flex-col items-start gap-3 p-6">
+        <h1 className="text-3xl font-bold">No crew sites yet</h1>
+        <p className="text-muted-foreground">The seed list is empty. Add one from a place search.</p>
+        <Button asChild>
+          <Link href="/new">Plan a site</Link>
+        </Button>
+      </Card>
+    );
+  }
+
   const featured = sites[0];
+  const featuredHours = results[0].hours;
   const f = summaries[0];
   const saved = f.crewRestMin - f.best.crewRestMin;
 
@@ -73,7 +95,7 @@ export default async function Home({
         </Card>
 
         <Card className="p-6 lg:col-span-8 lg:col-start-1 lg:row-start-3">
-          <LiveStripCell site={featured} />
+          <LiveStripCell site={featured} hours={featuredHours} />
         </Card>
 
         <Card tone="deep" className="flex flex-col justify-between gap-4 p-6 lg:col-span-4 lg:col-start-9 lg:row-start-3">

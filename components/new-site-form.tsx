@@ -7,12 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { Site, Workload } from "@/lib/data";
 import { WORKLOADS, WORKLOAD_KEYS, hourLabel } from "@/lib/heat";
-import { fetchHourly, isoDate, searchPlaces, type Place } from "@/lib/open-meteo";
+import { isoDate, pickEndpoint } from "@/lib/open-meteo";
 import { saveLocalSite, slugify } from "@/lib/site-store";
+import type { ApiResponse, HourlyResult, Place, Site, Workload } from "@/lib/types";
 
 type Status = { kind: "idle" } | { kind: "busy"; message: string } | { kind: "error"; message: string };
+
+/** GET an /api/* route and unwrap the shared ApiResponse shape. */
+async function getApi<T>(url: string): Promise<{ data: T; source: ApiResponse<T>["source"] }> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Request answered ${res.status}`);
+  const body = (await res.json()) as ApiResponse<T>;
+  if (!body.ok || body.data === null) throw new Error(body.error ?? "No data returned");
+  return { data: body.data, source: body.source };
+}
+
+const SOURCE_NOTE: Record<HourlyResult["source"], string> = {
+  archive: "the Open-Meteo historical archive",
+  forecast: "the Open-Meteo forecast",
+  seed: "the nearest seed day profile (offline mode)",
+};
 
 export function NewSiteForm() {
   const router = useRouter();
@@ -40,7 +55,7 @@ export function NewSiteForm() {
     if (q.trim().length < 2) return;
     setStatus({ kind: "busy", message: "Searching places…" });
     try {
-      const found = await searchPlaces(q.trim());
+      const { data: found } = await getApi<Place[]>(`/api/places?q=${encodeURIComponent(q.trim())}`);
       setPlaces(found);
       setStatus(found.length ? { kind: "idle" } : { kind: "error", message: `No place called "${q}" found. Try a nearby city.` });
     } catch (e) {
@@ -66,9 +81,11 @@ export function NewSiteForm() {
       setStatus({ kind: "error", message: "Pick a place from the search results first." });
       return;
     }
-    setStatus({ kind: "busy", message: `Fetching 24 hours for ${place.name} from Open-Meteo…` });
+    setStatus({ kind: "busy", message: `Fetching 24 hours for ${place.name}…` });
     try {
-      const r = await fetchHourly(place.latitude, place.longitude, date);
+      const qs = new URLSearchParams({ lat: String(place.latitude), lon: String(place.longitude), date });
+      const { data: r } = await getApi<HourlyResult>(`/api/hours?${qs.toString()}`);
+      if (r.hours.length === 0) throw new Error("No hourly data for that place and date");
       const offsetHours = Math.round(((r.hours[0].utcMs - Date.UTC(...ymdh(r.hours[0].local))) / -3600000) * 2) / 2;
       const crewName = name.trim() || `${place.name} crew`;
       const site: Site = {
@@ -83,7 +100,7 @@ export function NewSiteForm() {
         utcOffsetHours: offsetHours,
         date: r.date,
         profileDate: r.date,
-        mode: r.source === "archive" ? "archive" : "forecast",
+        mode: r.source === "seed" ? pickEndpoint(r.date) : r.source,
         workload,
         clothing: "workClothes",
         crewSize,
@@ -91,7 +108,7 @@ export function NewSiteForm() {
         newWorkerDay: 1,
         shiftStart,
         shiftHours: 8,
-        note: `Saved from ${r.source === "archive" ? "the Open-Meteo historical archive" : "the Open-Meteo forecast"} on ${isoDate(new Date())}.`,
+        note: `Saved from ${SOURCE_NOTE[r.source]} on ${isoDate(new Date())}.`,
         snapshot: r.hours,
         createdLocally: true,
       };

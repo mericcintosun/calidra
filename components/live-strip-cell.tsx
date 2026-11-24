@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import type { Site, Workload } from "@/lib/data";
+import type { HourlyWeather, Site, Workload } from "@/lib/data";
 import {
   STATUS_FILL,
   STATUS_LABEL,
@@ -16,13 +16,12 @@ import {
   shiftTotals,
   type HourStatus,
 } from "@/lib/heat";
-import { seedHours } from "@/lib/open-meteo";
 import { cn } from "@/lib/utils";
 
 /** The live product cell of the bento: one seeded site, a workload switch, a real 24 hour plan. */
-export function LiveStripCell({ site }: { site: Site }) {
+export function LiveStripCell({ site, hours }: { site: Site; hours: HourlyWeather[] }) {
   const [workload, setWorkload] = useState<Workload>(site.workload);
-  const heat = useMemo(() => computeHeat(seedHours(site), site.lat, site.lon), [site]);
+  const heat = useMemo(() => computeHeat(hours, site.lat, site.lon), [hours, site.lat, site.lon]);
   const plan = useMemo(() => planDay(heat, { ...site, workload }), [heat, site, workload]);
   const totals = shiftTotals(plan, { ...site, workload });
   const stops = plan.filter((h) => h.hour >= site.shiftStart && h.hour < site.shiftStart + site.shiftHours && h.status === "stop").length;

@@ -33,8 +33,8 @@ export default function NewSitePage() {
         <Card className="space-y-2 p-5 text-sm">
           <h2 className="text-xl font-semibold">What happens to your data</h2>
           <p className="text-muted-foreground">
-            Nothing leaves your browser except the place search and the weather request, both to Open-Meteo, with no key and
-            no account. Sites are saved in localStorage on this device.
+            Only the place search and the weather request leave your browser. They go through this site&apos;s server to
+            Open-Meteo, with no key and no account. Sites are saved in localStorage on this device.
           </p>
         </Card>
       </aside>

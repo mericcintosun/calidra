@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Range } from "@/components/ui/range";
-import type { HourlyWeather, PlanSettings, Site } from "@/lib/data";
+import type { ApiResponse, HourlyResult, HourlyWeather, PlanSettings, Site, WeatherSource } from "@/lib/types";
 import {
   CLOTHING,
   CLOTHING_KEYS,
@@ -28,16 +28,53 @@ import {
   shiftTotals,
   type HourPlan,
 } from "@/lib/heat";
-import { fetchHourly, seedHours, type WeatherSource } from "@/lib/open-meteo";
+import { resolveDate } from "@/lib/open-meteo";
 import { findLocalSite } from "@/lib/site-store";
 import { cn } from "@/lib/utils";
 
-type LoadState = { kind: "loading" } | { kind: "live"; source: WeatherSource; date: string } | { kind: "offline"; reason: string };
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "live"; source: WeatherSource; date: string }
+  | { kind: "saved" }
+  | { kind: "offline"; reason: string };
 
-/** The site detail: live hours, settings, the shift slider and the counter it moves. */
-export function PlanView({ site, initialHours }: { site: Site; initialHours: HourlyWeather[] }) {
+/** Hours for a site through the adapter seam: /api/hours answers with the shared ApiResponse shape. */
+async function loadHours(site: Site, signal: AbortSignal): Promise<HourlyResult> {
+  const qs = new URLSearchParams({
+    slug: site.slug,
+    lat: String(site.lat),
+    lon: String(site.lon),
+    date: resolveDate(site.date),
+  });
+  const res = await fetch(`/api/hours?${qs.toString()}`, { signal });
+  if (!res.ok) throw new Error(`Hours answered ${res.status}`);
+  const body = (await res.json()) as ApiResponse<HourlyResult>;
+  if (!body.ok || !body.data) throw new Error(body.error ?? "No hours returned");
+  return body.data;
+}
+
+/** The site detail: hours from the adapter, settings, the shift slider and the counter it moves. */
+export function PlanView({
+  site,
+  initialHours,
+  initialSource,
+}: {
+  site: Site;
+  initialHours: HourlyWeather[];
+  initialSource?: WeatherSource;
+}) {
   const [hours, setHours] = useState<HourlyWeather[]>(initialHours);
-  const [load, setLoad] = useState<LoadState>({ kind: "loading" });
+  // Sites made on /new keep the hours saved at creation and do not refetch.
+  const hasSnapshot = Boolean(site.createdLocally && site.snapshot && site.snapshot.length > 0);
+  // The server already rendered hours from the adapter, so the badge names their source from
+  // the first paint (and with JavaScript off); the client refresh below may replace them.
+  const [load, setLoad] = useState<LoadState>(
+    hasSnapshot
+      ? { kind: "saved" }
+      : initialSource
+        ? { kind: "live", source: initialSource, date: site.date }
+        : { kind: "loading" }
+  );
   const [s, setS] = useState<PlanSettings>({
     workload: site.workload,
     clothing: site.clothing,
@@ -50,10 +87,11 @@ export function PlanView({ site, initialHours }: { site: Site; initialHours: Hou
   const [selected, setSelected] = useState<number>(13);
 
   useEffect(() => {
+    if (hasSnapshot) return;
     const ctrl = new AbortController();
-    fetchHourly(site.lat, site.lon, site.date, ctrl.signal)
+    loadHours(site, ctrl.signal)
       .then((r) => {
-        setHours(r.hours);
+        if (r.hours.length > 0) setHours(r.hours);
         setLoad({ kind: "live", source: r.source, date: r.date });
       })
       .catch((e: unknown) => {
@@ -61,7 +99,8 @@ export function PlanView({ site, initialHours }: { site: Site; initialHours: Hou
         setLoad({ kind: "offline", reason: e instanceof Error ? e.message : "network error" });
       });
     return () => ctrl.abort();
-  }, [site.lat, site.lon, site.date]);
+    // Site fields are listed one by one so a new object for the same place does not refetch.
+  }, [site.slug, site.lat, site.lon, site.date, hasSnapshot]);
 
   const heat = useMemo(() => computeHeat(hours, site.lat, site.lon), [hours, site.lat, site.lon]);
   const plan = useMemo(() => planDay(heat, s), [heat, s]);
@@ -302,7 +341,10 @@ function HourDetail({ h, newCount }: { h: HourPlan; newCount: number }) {
 }
 
 function SourceBadge({ load }: { load: LoadState }) {
-  if (load.kind === "loading") return <Badge variant="outline">Loading Open-Meteo hours…</Badge>;
+  if (load.kind === "loading") return <Badge variant="outline">Loading hours…</Badge>;
+  if (load.kind === "saved") return <Badge variant="secondary">Hours saved with this site</Badge>;
+  if (load.kind === "live" && load.source === "seed")
+    return <Badge variant="secondary">Source: seed day profile</Badge>;
   if (load.kind === "live")
     return <Badge variant="ok">{load.source === "archive" ? "Open-Meteo historical archive" : "Open-Meteo forecast"}</Badge>;
   return (
@@ -382,5 +424,5 @@ export function StoredSitePlan({ slug }: { slug: string }) {
         </Button>
       </Card>
     );
-  return <PlanView site={state.site} initialHours={seedHours(state.site)} />;
+  return <PlanView site={state.site} initialHours={state.site.snapshot ?? []} />;
 }
