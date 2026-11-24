@@ -114,7 +114,7 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
           <li>
             <EmptyState
               title="No site matches those filters."
-              body="Clear the search or pick another workload."
+              body="Sites whose name, trade, city or country match the search, workload and weather filters show up here. Clear the filters to bring back every site."
               cta="Clear filters"
               onAction={() => update({ q: "", work: "all", mode: "all" })}
             />
@@ -154,10 +154,12 @@ function SiteRow({ row }: { row: SiteSummary }) {
       <Card className="grid gap-4 p-4 transition-colors group-hover:border-primary/60 sm:p-5 lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,13rem)] lg:items-center">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-display text-lg font-semibold">{row.name}</p>
+            <p className="min-w-0 truncate font-display text-lg font-semibold" title={row.name}>
+              {row.name}
+            </p>
             {row.local && <Badge variant="gold">Yours</Badge>}
           </div>
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground" title={`${row.trade}, ${row.city}, ${row.country}`}>
             {row.trade} · {row.city}, {row.country}
           </p>
           <p className="text-xs text-muted-foreground">

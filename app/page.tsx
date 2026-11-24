@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   title: { absolute: "Calidra: sun WBGT work/rest plans for outdoor crews" },
 };
 
+/** DEMO.md step 2: the Phoenix plan the largest cell links to. */
+const DEMO_SLUG = "phoenix-desert-ridge-framing";
+
 export default async function Home({
   searchParams,
 }: {
@@ -35,7 +38,7 @@ export default async function Home({
         <h1 className="sr-only">Crew sites</h1>
         <EmptyState
           title="No crew sites yet"
-          body="The seed list is empty. Add one from a place search."
+          body="Crew sites appear here with their 24 hour strip and peak sun WBGT. Plan one from a place search and a date to add the first."
           href="/new"
           cta="Plan a site"
         />
@@ -43,10 +46,15 @@ export default async function Home({
     );
   }
 
-  const featured = sites[0];
-  const featuredHours = results[0].hours;
-  const f = summaries[0];
+  const fi = Math.max(
+    sites.findIndex((s) => s.slug === DEMO_SLUG),
+    0
+  );
+  const featured = sites[fi];
+  const featuredHours = results[fi].hours;
+  const f = summaries[fi];
   const saved = f.crewRestMin - f.best.crewRestMin;
+  const live = adapter.mode === "real";
 
   return (
     <div className="space-y-16">
@@ -54,14 +62,21 @@ export default async function Home({
       <section aria-label="Calidra at a glance" className="calidra-drop-group grid gap-3 lg:grid-cols-12">
         <Card className="flex flex-col justify-between gap-8 p-7 sm:p-9 lg:col-span-7 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <div className="space-y-5">
-            <p className="text-sm font-semibold text-gold">For crew leads in construction, farming and landscaping</p>
+            <p className="text-sm font-semibold text-gold">For outdoor crew leads in construction, farming and landscaping</p>
             <h1 className="max-w-[16ch] text-4xl font-bold leading-[1.02] sm:text-5xl lg:text-6xl">
               Heat index assumes shade. Your crew works in the sun.
             </h1>
             <p className="max-w-[58ch] text-base text-muted-foreground sm:text-lg">
-              Calidra turns tomorrow&apos;s hourly weather into in-sun WBGT, then tells you how many minutes of every hour
-              your crew can work, how much shorter the plan must be for new hires, and which shift start loses the least time.
+              Calidra turns a site&apos;s hourly weather into in-sun WBGT, then gives the work and rest minutes for every
+              hour, a shorter plan for workers new this week, the shift start that loses the least time, and a one-page crew
+              sheet in English and Spanish.
             </p>
+            <Button asChild size="lg">
+              <Link href={`/site/${DEMO_SLUG}`}>
+                Open the {featured.city} plan
+                <ArrowUpRight aria-hidden />
+              </Link>
+            </Button>
           </div>
           <p className="max-w-[60ch] border-l-2 border-gold pl-4 text-sm">
             {featured.city}, {f.dateLabel}: sun WBGT reached {f.peakWbgtC.toFixed(1)}°C at {hourLabel(f.peakHour)}. A{" "}
@@ -86,7 +101,12 @@ export default async function Home({
         <Card tone="glow" className="flex flex-col justify-between gap-5 p-6 lg:col-span-3 lg:col-start-8 lg:row-start-2">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold leading-tight">Plan tomorrow for your crew</h2>
-            <p className="text-sm text-muted-foreground">City, workload, crew size. Three inputs, real forecast.</p>
+            <p className="text-sm text-muted-foreground">
+              City, workload, crew size.{" "}
+              {live
+                ? "Hours come from the Open-Meteo forecast or archive."
+                : "This deploy runs in sample mode, so hours come from stored day profiles."}
+            </p>
           </div>
           <Button asChild size="lg" className="w-full">
             <Link href="/new">Plan a site</Link>
@@ -109,12 +129,12 @@ export default async function Home({
             <h2 className="text-2xl font-semibold leading-tight">Physics, not a lookup table</h2>
             <p className="text-sm text-muted-foreground">
               Globe and natural wet bulb temperatures are solved by iteration from temperature, humidity, sunlight and
-              wind, every hour, in your browser.
+              wind, every hour, by Calidra&apos;s own engine.
             </p>
           </div>
           <Link
             href="/about"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
+            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
           >
             Read the method and its limits
             <ArrowUpRight className="size-4" aria-hidden />
@@ -129,8 +149,10 @@ export default async function Home({
               Crew sites
             </h2>
             <p className="max-w-[65ch] text-muted-foreground">
-              Seven real heat days replayed from the archive and three southern hemisphere sites on tomorrow&apos;s
-              forecast. Each strip is 24 hours; the bright stretch is the planned shift.
+              {live
+                ? "Seven past heat days from the Open-Meteo archive and three southern hemisphere sites on tomorrow's forecast."
+                : "Seven past heat days and three southern hemisphere sites, drawn from stored sample day profiles in this deploy."}{" "}
+              Each strip is 24 hours; the bright stretch is the planned shift.
             </p>
           </div>
         </div>
