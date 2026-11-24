@@ -1,23 +1,17 @@
-// Open-Meteo adapters. All three APIs are keyless and called for real from the browser:
+// Open-Meteo clients. All three APIs are keyless. lib/adapters/real.ts calls them on the
+// server behind /api/hours and /api/places when ADAPTER_MODE=real:
 //   Forecast   https://api.open-meteo.com/v1/forecast
 //   Historical https://archive-api.open-meteo.com/v1/archive
 //   Geocoding  https://geocoding-api.open-meteo.com/v1/search
 // seedHours() is the offline path: it expands a site's stored daily profile into 24 hours so
 // every page renders with JavaScript off or when the network fails. The UI says which one it shows.
 
-import type { HourlyWeather, Site } from "./data";
+import type { HourlyResult, HourlyWeather, Place, Site, WeatherSource } from "./types";
 import { cosZenith } from "./heat";
 
+export type { HourlyResult, Place, WeatherSource } from "./types";
+
 const HOURLY = "temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m,cloud_cover,surface_pressure";
-
-export type WeatherSource = "archive" | "forecast" | "seed";
-
-export interface HourlyResult {
-  hours: HourlyWeather[];
-  source: WeatherSource;
-  date: string;
-  timezone: string;
-}
 
 interface OpenMeteoHourly {
   utc_offset_seconds: number;
@@ -32,17 +26,6 @@ interface OpenMeteoHourly {
     surface_pressure: (number | null)[];
   };
   reason?: string;
-}
-
-export interface Place {
-  id: number;
-  name: string;
-  admin1?: string;
-  country: string;
-  latitude: number;
-  longitude: number;
-  timezone: string;
-  elevation?: number;
 }
 
 /** YYYY-MM-DD in the browser's calendar. */
