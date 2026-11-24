@@ -8,7 +8,7 @@ const body = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", d
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://calidra.vercel.app"),
-  title: { default: "Calidra: sun WBGT work/rest plans for outdoor crews", template: "%s · Calidra" },
+  title: { default: "Calidra: sun WBGT work/rest plans for outdoor crews", template: "%s | Calidra" },
   description:
     "For crew leads in construction, farming and landscaping: enter a site and see tomorrow's in-sun heat stress (WBGT) hour by hour, how many minutes to work and rest, and the shift start that loses the least time.",
 };

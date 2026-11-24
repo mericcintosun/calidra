@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
-
-const NAV = [
-  { href: "/", label: "Sites" },
-  { href: "/new", label: "New site" },
-  { href: "/about", label: "Method" },
-];
+import { SiteNav } from "@/components/site-nav";
 
 /** HEADER row of IDENTITY.md: solid ground, border-b in LINE, sticky. */
 export function SiteHeader() {
@@ -16,17 +11,8 @@ export function SiteHeader() {
           <BrandMark />
           Calidra
         </Link>
-        <nav aria-label="Main" className="flex items-center gap-1 text-sm font-medium">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-xl px-3 py-2 text-muted-foreground underline-offset-8 transition-colors hover:bg-deep hover:text-foreground hover:underline hover:decoration-gold"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {/* Active-route marking needs usePathname, so the nav is a client component. */}
+        <SiteNav />
       </div>
     </header>
   );
