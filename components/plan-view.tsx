@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { animate, useReducedMotion } from "motion/react";
-import { CloudSun, Wind } from "lucide-react";
+import { CloudSun, Printer, Wind } from "lucide-react";
 import { Legend } from "@/components/live-strip-cell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
   shiftTotals,
   type HourPlan,
 } from "@/lib/heat";
+import { applyPlanParams, parsePlanParams, toPlanQuery, type PlanOverrides } from "@/lib/plan-params";
 import { findLocalSite } from "@/lib/site-store";
 import { EmptyState, PageSkeleton } from "@/components/states";
 import { cn } from "@/lib/utils";
@@ -72,6 +74,7 @@ export function PlanView({
   initialSource,
   initialDate,
   mode,
+  overrides,
 }: {
   site: Site;
   initialHours: HourlyWeather[];
@@ -79,6 +82,8 @@ export function PlanView({
   /** The YYYY-MM-DD date the server resolved and fetched hours for. */
   initialDate?: string;
   mode?: DataMode;
+  /** Settings read from the URL by parsePlanParams; missing keys keep the site's defaults. */
+  overrides?: PlanOverrides;
 }) {
   const [hours, setHours] = useState<HourlyWeather[]>(initialHours);
   // Sites made on /new keep the hours saved at creation and do not refetch.
@@ -92,18 +97,23 @@ export function PlanView({
         ? { kind: "live", source: initialSource, date: site.date }
         : { kind: "loading" }
   );
-  const [s, setS] = useState<PlanSettings>({
-    workload: site.workload,
-    clothing: site.clothing,
-    crewSize: site.crewSize,
-    newWorkers: site.newWorkers,
-    newWorkerDay: site.newWorkerDay,
-    shiftStart: site.shiftStart,
-    shiftHours: site.shiftHours,
-  });
+  const [s, setS] = useState<PlanSettings>(() => applyPlanParams(site, overrides));
   const [selected, setSelected] = useState<number>(13);
   // Bumped by the "Retry live hours" button; any value above 0 forces one more request.
   const [retry, setRetry] = useState(0);
+  const query = toPlanQuery(s);
+
+  // Mirror the settings into the URL so a shared link (or the crew sheet QR) opens this exact
+  // plan. Native replaceState: no navigation, no server refetch, no rerender loop. The first
+  // render is skipped so opening a plain site link does not rewrite its address.
+  const wroteOnce = useRef(false);
+  useEffect(() => {
+    if (!wroteOnce.current) {
+      wroteOnce.current = true;
+      return;
+    }
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${query}`);
+  }, [query]);
 
   // The server page already rendered hours from the adapter, so the browser only asks again
   // when that is worth it: in real mode after a seed fallback (try live once more), in real mode
@@ -150,14 +160,25 @@ export function PlanView({
   return (
     <div className="space-y-6">
       <div className="calidra-drop flex flex-col gap-3">
-        <p className="text-sm font-semibold text-gold">
+        <p className="break-words text-sm font-semibold text-gold" title={`${site.trade}, ${site.city}, ${site.region}, ${site.country}`}>
           {site.trade} · {site.city}, {site.region}, {site.country}
         </p>
-        <h1 className="text-4xl font-bold leading-tight sm:text-5xl">{site.name}</h1>
-        <p className="max-w-[70ch] text-muted-foreground">{site.note}</p>
+        <h1 className="break-words text-4xl font-bold leading-tight sm:text-5xl" title={site.name}>
+          {site.name}
+        </h1>
+        <p className="max-w-[70ch] break-words text-muted-foreground">{site.note}</p>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="secondary">{load.kind === "live" ? formatSiteDate(load.date) : formatSiteDate(site.date)}</Badge>
           <SourceBadge load={load} />
+          {/* The print sheet reads seed sites through the adapter; browser-saved sites have none yet. */}
+          {!site.createdLocally && (
+            <Button asChild variant="secondary" size="sm" className="ml-auto">
+              <Link href={`/site/${site.slug}/print?${query}`}>
+                <Printer aria-hidden />
+                Crew sheet
+              </Link>
+            </Button>
+          )}
         </div>
         <DataStatement load={load} mode={mode} />
         {load.kind === "offline" && (
@@ -489,10 +510,14 @@ function clampInt(raw: string, min: number, max: number): number {
 
 /** Detail for a site created on /new: it lives in this browser (lib/site-store.ts). */
 export function StoredSitePlan({ slug }: { slug: string }) {
-  const [state, setState] = useState<{ kind: "loading" } | { kind: "found"; site: Site } | { kind: "missing" }>({ kind: "loading" });
+  const [state, setState] = useState<
+    { kind: "loading" } | { kind: "found"; site: Site; overrides: PlanOverrides } | { kind: "missing" }
+  >({ kind: "loading" });
   useEffect(() => {
     const site = findLocalSite(slug);
-    setState(site ? { kind: "found", site } : { kind: "missing" });
+    // This branch renders only in the browser, so the URL settings are read from window.location.
+    const overrides = parsePlanParams(new URLSearchParams(window.location.search));
+    setState(site ? { kind: "found", site, overrides } : { kind: "missing" });
   }, [slug]);
 
   if (state.kind === "loading") return <PageSkeleton label="Opening the site saved in this browser" />;
@@ -505,5 +530,5 @@ export function StoredSitePlan({ slug }: { slug: string }) {
         cta="Plan a new site"
       />
     );
-  return <PlanView site={state.site} initialHours={state.site.snapshot ?? []} />;
+  return <PlanView site={state.site} initialHours={state.site.snapshot ?? []} overrides={state.overrides} />;
 }
