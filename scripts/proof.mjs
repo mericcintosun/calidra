@@ -1,5 +1,5 @@
-// npm run proof: runs the live engine proof (live-weather and demo-path) and the test suite,
-// then rewrites the three PROOF blocks in README.md with what actually happened. It never throws, never invents a number,
+// npm run proof: runs the live engine proof (live-weather, demo-path, print-sheet) and the test suite,
+// then rewrites the four PROOF blocks in README.md with what actually happened. It never throws, never invents a number,
 // writes only inside this repo (README.md and one temp file under node_modules/.cache), exits 0
 // on every path, and stops itself after 110 seconds.
 
@@ -109,6 +109,20 @@ function demoPathProof(engine) {
   return { line, summary: `demo-path: ${(demo.steps ?? []).map((s) => `${s.slug}=${s.ms}ms`).join(" ")}` };
 }
 
+function printSheetProof(engine) {
+  if (engine.fail) return { line: `Not run in this build: ${engine.fail}.`, summary: "print-sheet: not run" };
+  const s = engine.out.printSheet;
+  if (!s) return { line: "Not run in this build: the engine script printed no print sheet result.", summary: "print-sheet: no result" };
+  if (!s.ok) return { line: `Not run in this build: ${s.reason}.`, summary: `print-sheet: not run (${s.reason})` };
+  const src = s.source === "seed" ? "the seed day profile (live archive call failed)" : `live ${s.source} hours`;
+  const first = s.first ? ` First row ${s.first.hour}: "${s.first.en}" / "${s.first.es}".` : "";
+  const line =
+    `Ran on ${today()}: lib/print-sheet.ts built the Phoenix sheet (${s.query}) from ${src} in English and Spanish, ` +
+    `${s.rows} shift rows, ${Number(s.totalRestMin).toLocaleString("en-US")} crew-minutes of rest.${first} ` +
+    `EN: ${s.bestEn} ES: ${s.bestEs} Same minutes in both languages: ${s.sameNumbers ? "yes" : "no"}.`;
+  return { line, summary: `print-sheet: rows=${s.rows} rest=${s.totalRestMin} source=${s.source}` };
+}
+
 async function liveWeatherProof(engine) {
   if (engine.fail) return { line: `Not run in this build: ${engine.fail}.`, summary: "live-weather: not run" };
   const out = engine.out;
@@ -173,13 +187,17 @@ function replaceBlock(text, name, line) {
   return `${text.slice(0, i + begin.length)}\n${line}\n${text.slice(j)}`;
 }
 
-async function writeReadme(live, tests, demo) {
+async function writeReadme(live, tests, demo, sheet) {
   try {
     const before = await readFile(README, "utf8");
     const after = replaceBlock(
-      replaceBlock(replaceBlock(before, "live-weather", live.line), "tests", tests.line),
-      "demo-path",
-      demo.line
+      replaceBlock(
+        replaceBlock(replaceBlock(before, "live-weather", live.line), "tests", tests.line),
+        "demo-path",
+        demo.line
+      ),
+      "print-sheet",
+      sheet.line
     );
     if (after !== before) await writeFile(README, after, "utf8");
   } catch (e) {
@@ -190,7 +208,7 @@ async function writeReadme(live, tests, demo) {
 async function main() {
   const hardStop = setTimeout(async () => {
     const stopped = { line: "Not run in this build: the proof did not finish within two minutes." };
-    await writeReadme(stopped, stopped, stopped);
+    await writeReadme(stopped, stopped, stopped, stopped);
     console.log("proof: stopped after 110 s");
     process.exit(0);
   }, HARD_STOP_MS);
@@ -199,17 +217,20 @@ async function main() {
   let live = { line: NOT_RUN_LIVE_OFFLINE, summary: "live-weather: not run" };
   let tests = { line: "Not run in this build: the test runner could not start.", summary: "tests: not run" };
   let demo = { line: "Not run in this build: the engine script did not run.", summary: "demo-path: not run" };
+  let sheet = { line: "Not run in this build: the engine script did not run.", summary: "print-sheet: not run" };
   try {
     const [engine, t] = await Promise.all([engineRun(), testsProof()]);
     tests = t;
     live = await liveWeatherProof(engine);
     demo = demoPathProof(engine);
+    sheet = printSheetProof(engine);
   } catch (e) {
     console.log(`proof: unexpected error (${e && e.message ? e.message : e})`);
   }
-  await writeReadme(live, tests, demo);
+  await writeReadme(live, tests, demo, sheet);
   console.log(live.summary);
   console.log(demo.summary);
+  console.log(sheet.summary);
   console.log(tests.summary);
   clearTimeout(hardStop);
   process.exit(0);

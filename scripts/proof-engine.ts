@@ -100,10 +100,53 @@ async function demoPath(): Promise<{ ok: boolean; reason?: string; steps: DemoSt
   return { ok: true, steps };
 }
 
+/**
+ * Part 3 (print-sheet): the DEMO.md step 8 sheet for Phoenix (heavy, crew 6, 2 new, start 05:00)
+ * built by lib/print-sheet.ts in English and Spanish. Live archive hours when the call works,
+ * otherwise the seed day profile; the result says which.
+ */
+async function printSheet(): Promise<Record<string, unknown>> {
+  try {
+    const { buildSheet } = await import("../lib/print-sheet");
+    const { applyPlanParams, parsePlanParams, toPlanQuery } = await import("../lib/plan-params");
+    const { seedHours } = await import("../lib/open-meteo");
+    const site = findSeedSite("phoenix-desert-ridge-framing");
+    if (!site) return { ok: false, reason: "the Phoenix seed site is missing" };
+    const settings = applyPlanParams(site, parsePlanParams(new URLSearchParams("start=5")));
+    let hours = seedHours(site);
+    let source: "archive" | "forecast" | "seed" = "seed";
+    try {
+      const live = await fetchHourly(site.lat, site.lon, site.date);
+      if (live.hours.length > 0) {
+        hours = live.hours;
+        source = live.source;
+      }
+    } catch {
+      // keep the seed profile; the line says so
+    }
+    const en = buildSheet(site, hours, settings, "en", { date: site.date, source });
+    const es = buildSheet(site, hours, settings, "es", { date: site.date, source });
+    return {
+      ok: true,
+      source,
+      query: toPlanQuery(settings),
+      rows: en.rows.length,
+      totalRestMin: en.totalRestMin,
+      first: en.rows[0] ? { hour: en.rows[0].hourLabel, en: en.rows[0].statusLabel, es: es.rows[0].statusLabel } : null,
+      bestEn: en.bestLine,
+      bestEs: es.bestLine,
+      sameNumbers: JSON.stringify(en.rows.map((r) => r.workMin)) === JSON.stringify(es.rows.map((r) => r.workMin)),
+    };
+  } catch (e) {
+    return { ok: false, reason: `the sheet could not be built (${e instanceof Error ? e.message : String(e)})` };
+  }
+}
+
 async function main(): Promise<void> {
   const live = await liveWeather();
   const demo = await demoPath();
-  console.log(`PROOF_JSON ${JSON.stringify({ ...live, demoPath: demo })}`);
+  const sheet = await printSheet();
+  console.log(`PROOF_JSON ${JSON.stringify({ ...live, demoPath: demo, printSheet: sheet })}`);
 }
 
 void main();

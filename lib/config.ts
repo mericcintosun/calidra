@@ -44,6 +44,12 @@ export const PLACE_RESULT_COUNT = 6;
 /** A day with fewer complete hours than this is treated as unreadable. */
 export const MIN_COMPLETE_HOURS = 12;
 
+/**
+ * Public base URL of the deploy, used for metadataBase and the crew sheet QR code. Public by
+ * design (it is the address people visit), so NEXT_PUBLIC_ is fine. No trailing slash.
+ */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://calidra.vercel.app").replace(/\/+$/, "");
+
 export type AdapterMode = "fake" | "real";
 
 /** ADAPTER_MODE=real selects the live Open-Meteo adapter; anything else, or unset, selects fake. */
