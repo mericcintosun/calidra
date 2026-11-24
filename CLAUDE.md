@@ -8,13 +8,17 @@ Read `IDENTITY.md` (binding for colors, fonts, routes, motion), then `HANDOFF.md
 - `npm run build` (must stay green after every change)
 - `npm run dev` (http://localhost:3000)
 - `npm run seed` (checks that seed slugs in `lib/data/seed.ts` are unique and that 8 or more sites exist; writes nothing)
+- `npm test` (Vitest, offline: `tests/heat.test.ts`, `tests/schemas.test.ts`, `tests/http.test.ts`)
+- `npm run proof` (one live Open-Meteo call plus the test run; rewrites the PROOF blocks in README.md, exits 0 even offline)
 
 ## Data seam
 
 - `lib/types.ts` holds every shared type, including `ApiResponse<T>`.
 - `lib/data/seed.ts` holds the 10 seed sites. `lib/data.ts` re-exports types and seed and keeps `parseFilters`. The directory `lib/data/` and the file `lib/data.ts` coexist on purpose; `@/lib/data` resolves to the file.
-- `lib/adapter.ts` exports `getAdapter()`. `ADAPTER_MODE=real` picks `lib/adapters/real.ts` (Open-Meteo); anything else picks `lib/adapters/fake.ts` (seed).
-- Server pages call `getAdapter()`. Client components call `/api/sites`, `/api/sites/[slug]`, `/api/hours`, `/api/places`. No file under `app/` or `components/` imports `fetchHourly`, `searchPlaces` or `seedHours`.
+- `lib/adapter.ts` exports `getAdapter()`. `adapterMode()` in `lib/config.ts` (the only reader of `ADAPTER_MODE`) returns `"real"` for `ADAPTER_MODE=real`, which picks `lib/adapters/real.ts` (Open-Meteo); anything else picks `lib/adapters/fake.ts` (seed).
+- `lib/config.ts` holds every endpoint, timeout, retry, revalidate and query limit constant. Every outbound fetch goes through `fetchJson()` in `lib/http.ts`. Query and upstream schemas live in `lib/schemas.ts`; error codes and hints in `lib/errors.ts`.
+- Server pages call `getAdapter()`. Client components call `/api/sites`, `/api/sites/[slug]`, `/api/hours`, `/api/places`. No file under `app/` or `components/` imports `fetchHourly`, `searchPlaces` or `seedHours`, and no `"use client"` file imports `lib/config.ts`, `lib/http.ts` or `lib/open-meteo.ts` (date helpers `isoDate` and `resolveDate` live in `lib/heat.ts`).
+- `ApiResponse.error` is `{ error: ErrorCode, hint }` or null. Switch on the code, never on text.
 
 ## Stack pitfalls
 
