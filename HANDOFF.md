@@ -341,3 +341,100 @@ None. The agent had no shell.
 Phase 4: EN/ES print sheet with QR, plan settings in the URL, hover breakdown, `layoutId` morph and signature 3, landing and OG polish.
 
 Closing commit message: `faz-3: demo path on real data, browser store, state triad and reset`.
+
+---
+
+# Phase 4 working notes
+
+- Current state: 4 routes on the adapter seam, settings live only in `PlanView` state, no print route, nav is one row of three links, no LICENSE or SECURITY.md.
+- Phase goal: settings held in the URL, `/site/[slug]/print` EN/ES crew sheet with QR (DEMO step 8), responsive pass at 360/768/1280, landing and share metadata, DELIVERY.md, then the web and wallet security sweep.
+- Files to touch: `lib/plan-params.ts`, `lib/print-sheet.ts`, `components/plan-view.tsx`, `components/crew-sheet.tsx`, `app/site/[slug]/page.tsx`, `app/site/[slug]/print/*`, `components/site-nav.tsx`, `components/ui/*`, `app/layout.tsx`, `app/page.tsx`, `lib/config.ts`, proof scripts, tests, README, DEMO, DELIVERY, SECURITY, LICENSE.
+
+# Phase 4 handover: crew sheet with QR, URL-held plan, responsive pass, security sweep
+
+## Goal
+
+DEMO.md step 8: from `/site/phoenix-desert-ridge-framing`, "Crew sheet" opens `/site/[slug]/print` with the tuned settings from the URL, an EN/ES toggle and a QR back to the same plan. Second wow: the crew lead presses one button and gets a Spanish and English one-page work/rest plan whose QR reopens exactly the plan they tuned. Plus the responsive pass, share metadata, DELIVERY.md and the web and wallet security sweep.
+
+Selection reasoning: the unbuilt features from the idea were the EN/ES sheet with QR (1.5 h), the hover breakdown and URL state. The sheet is the most visible in the 90 s script (1:15 to 1:25), needs no new seat or provider, and URL state is its prerequisite, so URL state was built inside this slice. The hover breakdown stays for Phase 5.
+
+## Status
+
+All slices A1 to A5 and B1, B2 were written. Nothing was installed, built, tested or run. Evidence below is from reading the files.
+
+- [x] `lib/plan-params.ts` exports `planParamsSchema`, `parsePlanParams`, `applyPlanParams`, `toPlanQuery`. `components/plan-view.tsx` imports `applyPlanParams, parsePlanParams, toPlanQuery` (import block near the top; `parsePlanParams` is used by `StoredSitePlan` on `window.location.search`). `app/site/[slug]/page.tsx` awaits `searchParams` and calls `parsePlanParams`; no `useSearchParams` anywhere (Grep: only a comment in `components/demo-reset.tsx:10`).
+- [x] `PlanView` mirrors settings with `window.history.replaceState(window.history.state, "", ...)` in one effect keyed on the query string; the first render is skipped so a plain link is not rewritten. No `router.push`.
+- [x] `app/site/[slug]/print/page.tsx`, `loading.tsx` (`PageSkeleton`), `error.tsx` (`ErrorState`, shell kept) exist. The page imports `buildSheet, parseLang` from `@/lib/print-sheet`, `toString` from `qrcode`, `getAdapter` from `@/lib/adapter`, `SITE_URL, SLUG_PATTERN` from `@/lib/config`. A slug that fails `SLUG_PATTERN` calls `notFound()`; a well-formed slug unknown to the adapter renders `LocalSheetFallback`, which says "A site saved in this browser has no print sheet yet..." with a link to `/new`, or, if the browser has no such site either, "No crew site at this address" with a link to `/`.
+- [x] `components/crew-sheet.tsx`: language toggle is two `Link`s to `?...&lang=en|es` (works with JS off), controls row carries `print:hidden`, table in `hidden overflow-x-auto md:block print:block`, card list `md:hidden print:hidden`, all controls `min-h-11`.
+- [x] "Crew sheet" button-link in `PlanView` header row (`/site/${site.slug}/print?${query}`), hidden for browser-saved sites. DEMO.md step 8 documents it.
+- [x] Depth: `lib/print-sheet.ts` is the only producer of the sheet data; deleting it breaks the print page import. README "Crew sheet" says so.
+- [x] `package.json`: only `qrcode ^1.5.4` (dependencies) and `@types/qrcode ^1.5.5` (devDependencies) added. `.env.example` lists `NEXT_PUBLIC_SITE_URL=https://calidra.vercel.app`. `.farm-live.json` unchanged: the new variable is public by design (the deploy's own address) and has a working default, so it is neither a secret nor required.
+- [x] `components/site-nav.tsx`: desktop `nav` is `hidden md:flex`; a `md:hidden` button with `min-h-11 min-w-11`, `aria-expanded`, `aria-controls="site-nav-panel"` toggles a `md:hidden` panel with Sites, New site, Method. `useState` only; closes on `pathname` change and on link click; `aria-current` kept.
+- [x] Wide elements: hour strip (`min-w-[60rem]` in `overflow-x-auto`, unchanged), `/about` table (`min-w-[34rem]` in its own `overflow-x-auto max-w-full` Card), sheet table (own wrapper plus card list below md), collection rows (one column below lg; name and place `truncate` plus `title`), settings grid (two number inputs, fits 360 px). Site name, place line and the sheet title use `break-words` plus `title`; the QR URL uses `break-all` plus `title`.
+- [x] Hit areas: `components/ui/button.tsx` every size is `min-h-11` (sm was `h-8`), `Input` is `h-11`, `Range` is `h-11` with a transparent box around the native track, nav links, back links, the brand link, the bento "Read the method" link, the live strip site link and the `/about` summaries carry `min-h-11`.
+- [x] `app/not-found.tsx` and `app/error.tsx` render inside `app/layout.tsx` (root layout wraps both; only a `global-error.tsx` would replace it, and none exists), so header and nav stay.
+- [x] Home: the largest cell (`lg:col-span-7 lg:row-span-2`) names Calidra in its paragraph, says what it does and for whom, and has a `Button` link to `/site/phoenix-desert-ridge-framing`. Hrefs on `/`: `/site/${DEMO_SLUG}`, `/new`, `/about`, `/site/${slug}` (rows), all route files. The two "real forecast" lines now read from `adapter.mode`.
+- [x] `app/layout.tsx`: `metadataBase` from `SITE_URL`, title default plus `%s | Calidra`, 129 character `description`, `openGraph` (title, description, siteName, type website, url), `twitter.card: "summary_large_image"`. `app/opengraph-image.tsx` (untouched, never-touch list) returns `ImageResponse` with `size = { width: 1200, height: 630 }`. `app/icon.svg` untouched and picked up by the file convention. Site and print pages export titles with the site name.
+- [x] Hex grep `#[0-9a-fA-F]{3,8}` over `app/`, `components/`, `lib/`: only `app/globals.css` and `app/opengraph-image.tsx`. The QR tile uses Tailwind `bg-white` (needed for scanning) and the print variants use `print:bg-white print:text-black print:border-black`; no new hex. `console.log|debug|info` in `app/`, `components/`, `lib/`: only the `[core]` server lines in `lib/http.ts` and `lib/open-meteo.ts`.
+- [x] README: "Bounties" with the exact sentence, "Crew sheet" section with `<!-- PROOF:BEGIN print-sheet -->` / `<!-- PROOF:END print-sheet -->` (honest "Not run" line until the runner runs `npm run proof`), "Security" pointer, stack line adds `qrcode 1` (in `package.json`); Next 15, React 19, Tailwind 4, zod 3, Vitest 3 match `package.json` majors.
+- [x] `DELIVERY.md`: headings `First Place`, `Second Place`, `Third Place`, `Honorable Mention`; watch steps 2, 4, 4, 8, all present in DEMO.md (steps 1 to 8); before-submitting list. `LICENSE` (MIT) created, it was missing.
+- [x] `SECURITY.md` has the four sections. Footer line in `app/layout.tsx` with `target="_blank" rel="noopener noreferrer"`.
+- [x] Sameness greps over `app/`, `components/`, `lib/`: dead hexes, `fade-up|float-y|glow-pulse|caret-blink|pulse-dot`, `--delay|--d:`, `backdrop-blur`: zero hits. `<BrandMark`: one hit, `components/site-header.tsx:11`. Em dash, en dash, double hyphen and banned words over every file this phase wrote: zero hits.
+- [x] Imports checked by reading: `qrcode` (added), `lucide-react` `Menu`, `X`, `Printer`, `ArrowLeft`, `ArrowUpRight`; every `@/` path points to an existing file. Seed untouched, 10 sites.
+
+Unverified (runner and human): `npm install`, `npm run build` (incl. `@types/qrcode` named import `toString`), `npm test` (new suites `tests/plan-params.test.ts`, `tests/print-sheet.test.ts`), `npm run proof`, the deploy, QR scan, print preview fitting one page, 360/768/1280 checks, Lighthouse.
+
+## Decisions
+
+- **Seventh URL key `hours`.** The spec lists six keys; shift length is also a setting the lead tunes, so `hours` (6, 8 or 10) rides along. Without it the QR could reopen a different shift.
+- **Overrides vs settings.** `parsePlanParams` returns only valid keys; `applyPlanParams(defaults, overrides)` does the cross-field rules (new workers capped at crew, start must fit 04:00 to 24 minus shift length, else the site's start). Each key is parsed on its own, so one bad value never drops the others.
+- **Unknown vs saved slug.** The server cannot read localStorage, so a malformed slug is `notFound()` and a well-formed unknown slug goes to a small client check (`LocalSheetFallback`) that words both cases. The "Crew sheet" button is hidden for browser-saved sites, so the demo never leads to that empty state.
+- **Rows.** The sheet lists the shift hours only (not 24), so it fits one printed page.
+- **Spanish wording.** Static dictionary in `lib/print-sheet.ts`; "minutos por persona" for crew-minutes. Worth one read by a native speaker before the video.
+- **Print styling.** `print:` variants only, no `@media print` block in `app/globals.css`. Header and footer carry `print:hidden`; `body` and the sheet switch to white and black on paper.
+- **Touch targets globally.** Changed the `Button` size scale (all `min-h-11`) instead of patching each call site, so chips and settings buttons are taller on desktop too.
+- **`/api/sites/[slug]`** had no zod check; added `siteSlugSchema` (`lib/schemas.ts`), 400 for a malformed slug, 404 for an unknown one.
+- **`/about` heading** "Five steps, all in the browser" became "Five steps from weather to break minutes" (the engine runs on the server for page renders too). The bento physics line likewise says "by Calidra's own engine".
+- **Env.** One new public variable, `NEXT_PUBLIC_SITE_URL`, read only by `SITE_URL` in `lib/config.ts` (fallback `https://calidra.vercel.app`), also used for `metadataBase`. No new secret, so `.farm-live.json` is unchanged.
+
+### Security sweep (B1, B2)
+
+- Key-like strings (`sk-...`, `PRIVATE_KEY`, 64-hex, 40+ char base64) in `app/`, `components/`, `lib/`, `scripts/`: none.
+- `target="_blank"`: one, the new footer link, with `rel="noopener noreferrer"`.
+- `http://` in app code: none. Noted exceptions: the SVG `xmlns` in `app/icon.svg` and a localhost example in the console output of `scripts/demo-reset.mjs` (not app code).
+- Forms: `components/new-site-form.tsx` fetches only `/api/places` and `/api/hours`, then saves through `lib/site-store.ts`. `components/plan-view.tsx` fetches only `/api/hours`. Open-Meteo is named on `/about`, `/new`, `/`, the site page source badge and the footer.
+- `useSearchParams`: absent. `fs` writes in `app/`, `components/`, `lib/`: none. `process.env` reads: `ADAPTER_MODE`, `NEXT_PUBLIC_SITE_URL` (`lib/config.ts`), `NEXT_PUBLIC_BRAND_FILES` (`lib/brand-files.ts`), all in `.env.example`.
+- `/api/hours` and `/api/places` call `safeParse` first; `/api/sites/[slug]` now too; `/api/sites` takes no input. No route holds a secret or logs a request body.
+- Contract front skipped: `contracts/` does not exist. Wallet front vacuous: Grep for `eth_requestAccounts|ethereum|wagmi|viem|ethers|personal_sign|eth_sign` over the repo (excluding `node_modules`, `.git`, `.next`) returned zero hits before `SECURITY.md` was written. No Blockaid warning is expected, since no wallet code exists.
+- Nothing parked; no finding left unfixed.
+
+## Failed attempts
+
+None seen; nothing could be run.
+
+## Files changed
+
+New: `lib/plan-params.ts`, `lib/print-sheet.ts`, `components/crew-sheet.tsx`, `app/site/[slug]/print/page.tsx`, `app/site/[slug]/print/loading.tsx`, `app/site/[slug]/print/error.tsx`, `tests/plan-params.test.ts`, `tests/print-sheet.test.ts`, `DELIVERY.md`, `SECURITY.md`, `LICENSE`, `.farm-commits.json`.
+
+Edited: `app/site/[slug]/page.tsx`, `components/plan-view.tsx`, `lib/config.ts`, `lib/schemas.ts`, `.env.example`, `package.json`, `scripts/proof-engine.ts`, `scripts/proof.mjs`, `components/site-nav.tsx`, `components/site-header.tsx`, `components/ui/button.tsx`, `components/ui/input.tsx`, `components/ui/range.tsx`, `components/live-strip-cell.tsx`, `components/site-collection.tsx`, `app/about/page.tsx`, `app/page.tsx`, `app/layout.tsx`, `app/api/sites/[slug]/route.ts`, `README.md`, `DEMO.md`, `HANDOFF.md`.
+
+## Commands run
+
+None. The agent had no shell.
+
+## Open questions
+
+- `qrcode` is CommonJS; the print page uses the named import `toString`. If the build rejects it, switch to `import QRCode from "qrcode"` and `QRCode.toString(...)` (esModuleInterop is on).
+- Print preview fitting one page is unchecked: 8 rows plus header and QR should fit A4 and Letter; a 10 h shift adds two rows.
+- `LICENSE` copyright line says "Meric" (the git user); change it to the team's names if needed.
+- `CLAUDE.md` still lists the old test files and two env keys; it was outside this phase's fence. Add `tests/plan-params.test.ts`, `tests/print-sheet.test.ts` and `NEXT_PUBLIC_SITE_URL` next phase.
+- Still open from earlier phases: OSHA reference values in `tests/wbgt-reference.json` (human task); student eligibility and team names (DELIVERY.md list).
+
+## Unmet against the spec
+
+- "An unknown slug calls `notFound()`" holds only for malformed slugs; a well-formed unknown slug shows the written "No crew site at this address" panel with status 200, because the server cannot tell it from a browser-saved site.
+- Nothing else is known unmet by reading. Every runtime check is unverified, as listed above.
+
+## Next best step
+
+Phase 5, the frontend pass: `layoutId` morph (signature 2), signature 3 (the sort/compare control), the hover breakdown, final polish.
