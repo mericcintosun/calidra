@@ -438,3 +438,99 @@ None. The agent had no shell.
 ## Next best step
 
 Phase 5, the frontend pass: `layoutId` morph (signature 2), signature 3 (the sort/compare control), the hover breakdown, final polish.
+
+---
+
+# Phase 5 handover: frontend pass, bento scene and submission package
+
+## Goal
+
+The 90 s demo (DEMO.md steps 1 to 8) runs on a finished-looking product: signature 2 (`layoutId` morph), signature 3 (sort control), the hour hover breakdown, scene slots on every route, and the submission files (README, SUBMISSION.md, docs/SCREENSHOTS.md).
+
+## Status
+
+Written by reading and editing files only. Nothing was installed, built, tested or run. **No live deployment existed and no screenshots were available, so the whole diagnosis was made from the source files.** Every item below is checked by reading or Grep.
+
+- [x] Primitives: new `components/ui/segmented.tsx` (group of `aria-pressed` buttons, not a tablist, optional `indicator` slot) and `components/ui/disclosure.tsx` (styled details/summary). The nav's bare `<button>` is now `Button variant="outline" size="icon"` (`components/site-nav.tsx`). Grep `<button|<input|<select` over `app/` and `components/`: only `components/ui/input.tsx`, `components/ui/range.tsx`, `components/ui/segmented.tsx`.
+- [x] Home L4 (`app/page.tsx`): six cells at lg, cols x rows: claim 7x2, image (scene 1) 5x1, CTA 3x1, sun gap 2x1, live product 8x1, method 4x1. All pairwise different; the claim (h1) sits in the largest cell (area 14). One primary Button on the page: "Compare the crew sites" (`href="#sites"`, DEMO step 1); "Plan your own site" is `variant="outline"`. No copy above the grid. The gold eyebrow became muted ink with a 6 px gold dot.
+- [x] One glow per screen: `/` CTA cell, `/site/[slug]` counter card, `/new` form card, `/about` scene 2 card (the threshold table card moved to `deep` because it now folds closed).
+- [x] Footer (`app/layout.tsx`): one sentence (screening disclaimer) plus four links: GitHub repo, Code for Change on Devpost, Open-Meteo, `/about`.
+- [x] Simplification: `/about` intro one sentence, steps in `Disclosure`, threshold table behind "Show the threshold table for all four workloads" with one sentence above it computed from the engine; `/new` intro one sentence plus the mode sentence; collection footnote one sentence; claim cell one sentence.
+- [x] Signature 1 kept: `useAutoAnimate` at `components/site-collection.tsx` (import line 5).
+- [x] Signature 2: `layoutId` in `components/site-collection.tsx` (row and quick look) and `components/plan-view.tsx` (header `motion.h1` and figure block), all inside `LayoutGroup id={SITES_LAYOUT_GROUP}` from `components/site-figures.tsx`.
+- [x] Signature 3: `components/site-sort-bar.tsx` (`SiteSortBar`, `sortRows`, `stopHours`), Motion `layoutId="site-sort-indicator"` highlight; sort keys `peak | stops | rest | name` in `lib/types.ts`, parsed by `parseFilters` in `lib/data.ts`, written to the URL by `update()` in the collection. The active figure is outlined in every row by `SiteFigures` (`components/site-figures.tsx`).
+- [x] Hover breakdown: `HourBreakdown` in `components/plan-view.tsx`, a `Card` with `id="hour-breakdown"` (`BREAKDOWN_ID`) and `role="tooltip"`, opened by `onMouseEnter` and `onFocus` on each hour `Button`, closed by leave, blur or Escape; the open column carries `aria-describedby`. Values are `HourPlan` fields: air, humidity, sunlight, wind at 2 m, heat index and band, sun WBGT, status, veteran and new-worker work/rest minutes.
+- [x] Live cell (`components/live-strip-cell.tsx`): `motion.div layout` expands on hover or focus inside (taller bars, labels every 3 h, a readout of the peak hour, the stop-work hours and the best start from `bestStart`).
+- [x] Every file importing `motion/react` or `@formkit/auto-animate/react` starts with `"use client"`: `components/live-strip-cell.tsx`, `components/plan-view.tsx`, `components/site-collection.tsx`, `components/site-sort-bar.tsx`.
+- [x] Reduced motion: every `layout` and `layoutId` is `undefined` or `false` when `useReducedMotion()` is true; the CSS block at `app/globals.css:129` covers `.calidra-drop` and `.calidra-drop-group > *`; AutoAnimate follows the OS setting by default. No server-rendered `opacity-0`; the popover and the expanded readout are absent from server HTML, not hidden.
+- [x] Motion system: `.calidra-drop-group` now on the bento, the `PlanView` root (header, plan grid, hour card stagger) and the `/about` root; `/new` keeps `.calidra-drop`. One keyframe block.
+- [x] Sameness greps over `app/` and `components/` (counts in `.farm-delta.md`): dead hexes and banned keyframes 0, `role="tablist"` 0, `animate-pulse` 0, `--delay|--d:` 0, `backdrop-blur` 0, `mask-image` 0, `Reveal|CopyChip` 0, `font-mono` 0.
+- [x] Brand link unchanged: one `<BrandMark />` inside the header Link.
+- [x] README, SUBMISSION.md, docs/SCREENSHOTS.md written; bounty table rows are "First Place | $ 200 in cash" and "Runner-up recognition award." for Second, Third, Honorable Mention. Grep for `<PASTE|Paste the|TBD|placeholder until|ADD_VIDEO_URL|video` in README.md, SUBMISSION.md and docs/: 0. Banned words and dash characters: 0.
+
+### Scene slots
+
+| n | Route | File | Shape | Source |
+| --- | --- | --- | --- | --- |
+| 1 | `/` (pure image cell) | `app/page.tsx` | 960 x 640 | SVG fallback `public/illustrations/scene-1.svg` (existing) |
+| 2 | `/about` (intro, glow card) | `app/about/page.tsx` | 960 x 600 | SVG fallback `scene-2.svg` (existing) |
+| 3 | `/new` (beside the form) | `app/new/page.tsx` | 960 x 720 | SVG fallback `scene-3.svg` (existing) |
+| 4 | `/site/[slug]` (under settings) | `components/plan-view.tsx` | 880 x 440, wide | SVG fallback `scene-4.svg` (new) |
+| 5 | `/` (beside the "Crew sites" title) | `app/page.tsx` | 640 x 600, near square | SVG fallback `scene-5.svg` (new) |
+| 6 | `/about` (closing, beside Sources) | `app/about/page.tsx` | 720 x 720, square | SVG fallback `scene-6.svg` (new) |
+
+`public/brand/` is empty, so all six render their SVG fallback. The new SVGs use only key-block hexes, rounded forms, no comments and no `--`.
+
+## Decisions
+
+- **Signature 2 approach: both (a) and (b).** Matching `layoutId`s sit on the collection row, its in-place "Quick look" panel and the `PlanView` header. The in-place panel (option a) is where the morph reliably runs: pressing "Quick look" morphs the row's name and figure block into the larger panel in the same tree, and the panel holds a real link to `/site/[slug]`. A full route change (option b) crosses the `app/site/[slug]/loading.tsx` boundary, so the old row unmounts before the header mounts; that path falls back to the `calidra-drop` entrance. The row name is a real `Link`, the toggle is a `Button` with `aria-expanded`.
+- **Sort values.** All come from `summarizeSite` in `lib/heat.ts` (unchanged): `peakWbgtC`, `crewRestMin` (current shift at the site's settings) and stop-work hours, counted by `stopHours()` from the summary's `strip` inside the site's own shift. The spec named "hours where heavy work must stop"; the count uses each site's own workload, and the label says "Stop-work hours in shift" to stay true. Ties fall back to peak then name.
+- **Detail figures.** `PlanView` shows the same `SiteFigures` block computed with `summarizeSite(site, hours)`, plus a line saying these use the site's saved plan while the counter follows the lead's settings.
+- **Hover breakdown placement.** The popover is positioned in a `relative` wrapper outside the strip's `overflow-x-auto` box, so it is never clipped; its left edge is clamped inside the strip.
+- **Footer hackathon link.** No exact Devpost URL for Code for Change is recorded in the repo, so the footer links to `https://devpost.com/hackathons?search=Code%20for%20Change`. Replace it with the hackathon page address once confirmed.
+- **CTA target.** DEMO step 1 continues into the collection, so the one primary CTA scrolls to `#sites`; the Phoenix plan is reached from the claim cell link, the live cell link and the row.
+- **No new dependency, route, env variable or schema change.** `SortKey` gained `"stops"` (a type, parsed from the URL; invalid values still fall back to `peak`).
+
+## Failed attempts
+
+None seen; nothing could be run.
+
+## Files changed
+
+New: `components/ui/segmented.tsx`, `components/ui/disclosure.tsx`, `components/site-sort-bar.tsx`, `components/site-figures.tsx`, `public/illustrations/scene-4.svg`, `scene-5.svg`, `scene-6.svg`, `SUBMISSION.md`, `docs/SCREENSHOTS.md`, `.farm-commits.json`.
+
+Edited: `app/page.tsx`, `app/layout.tsx`, `app/about/page.tsx`, `app/new/page.tsx`, `components/site-nav.tsx`, `components/site-collection.tsx`, `components/plan-view.tsx`, `components/live-strip-cell.tsx`, `lib/types.ts`, `lib/data.ts`, `README.md`, `DEMO.md`, `CLAUDE.md`, `IDENTITY.md` (one Amendments line), `HANDOFF.md`.
+
+## Commands run
+
+None. The agent had no shell.
+
+## Open questions
+
+- Motion `^14.14.0` is the range IDENTITY.md fixes; the APIs used (`motion`, `LayoutGroup`, `layoutId`, `layout`, `useReducedMotion`, `animate`) are long-standing. If the build reports a type mismatch on `layout={false}`, switch to `layout={reduce ? undefined : "position"}`.
+- `w-68` (popover width) relies on Tailwind 4's open spacing scale. If it does not compile, use `w-[17rem]`.
+- AutoAnimate on the `ul` and Motion layout on each row both react when a quick look opens; check that the rows below slide once, not twice.
+- `.env.example` keeps `NEXT_PUBLIC_BRAND_FILES` commented out because `next.config.ts` sets it at build time.
+- Still open: OSHA reference values in `tests/wbgt-reference.json` (human task, README states it is not filled); the hackathon page URL above.
+
+## Unmet against the spec
+
+- The route-change morph (row to `/site/[slug]`) is not guaranteed; the in-place panel carries the morph (`components/site-collection.tsx`, `SiteRow`, `open` branch). Spec option (a) and (b) both allowed this.
+- `npm run build`, `npm test`, `npm run proof`, the 360/768/1280 checks, Lighthouse and the print preview are unverified (no shell).
+- No "compare two" toggle (optional, cut first by the spec).
+- At 768 px the bento is a single stacked column (only `lg:` spans exist), which avoids horizontal scroll but does not show the unequal grid until 1024 px.
+
+## Next best step
+
+Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run proof`, then commit from `.farm-commits.json` and redeploy. Then Phases 6 and 7: judge rounds, freeze and tag.
+
+## Manual submit checklist (human)
+
+- [ ] Every team member is a student and above the age of majority where they live.
+- [ ] Every team member's name is added on Devpost.
+- [ ] The GitHub repo is public.
+- [ ] Record the demo video yourself and paste its link into Devpost; upload it to public YouTube or Vimeo.
+- [ ] Gallery thumbnail 3:2, under 5 MB (see `docs/SCREENSHOTS.md`).
+- [ ] Paste the fields from `SUBMISSION.md` in order; confirm the live URL and the crew sheet QR host match the deploy.
+- [ ] Submit by 29 November (deadline 1 December 2026, 5:00 pm PST).
+- [ ] Ask the organizer about the winners date: the rules page says 21 November, the dates page 5 December.

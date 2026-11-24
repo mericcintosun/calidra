@@ -83,3 +83,5 @@ Rules:
 - every interaction is driven by the real seed data; a decorative animation with no product meaning does not count as a signature
 
 ## Amendments (append-only; later phases add dated lines here, never edit anything above)
+
+- 2026-11-24 (phase 5): K7 signature 2 uses matching `layoutId`s (`site-${slug}-name`, `site-${slug}-figure`) on the collection row, its in-place "Quick look" panel and the `PlanView` header. The in-place panel is where the morph reliably runs; a full route change to `/site/[slug]` falls back to the `calidra-drop` entrance. Signature 3 is the segmented sort control in `components/site-sort-bar.tsx`.

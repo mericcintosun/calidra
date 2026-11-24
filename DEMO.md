@@ -2,7 +2,7 @@
 
 **Problem:** Heat index assumes shade; your crew works in the sun.
 
-**Trigger:** open the start route, press the Phoenix row.
+**Trigger:** open the start route, sort by stop-work hours, open the Phoenix row.
 
 **Wow moment:** drag the shift start from 07:00 to 05:00 on the Phoenix site and watch the rest counter roll down while the "Best window" badge updates, beside a line where the heat index reads a lower band than the sun verdict for an hour where WBGT says stop ("Caution" on days where that happens, "Extreme caution" on the Phoenix seed).
 
@@ -18,8 +18,8 @@ Data: every step renders through `lib/adapter.ts` and the `/api/*` handlers. The
 
 ## Steps
 
-1. `/` (`app/page.tsx`): read the problem line in the largest bento cell, point at the live strip cell, then the crew site collection below it. Press one workload filter to show the rows reorder, then clear it.
-2. `/site/phoenix-desert-ridge-framing` (`app/site/[slug]/page.tsx`): press the Phoenix row. The hour strip fills. Point at the line under the counter: the heat index reads a lower band than the sun verdict for an hour where sun WBGT says stop. On the Phoenix seed that band is "Extreme caution"; on days with a "Caution" hour it reads "Caution".
+1. `/` (`app/page.tsx`): read the problem line in the largest bento cell, hover the live strip cell (it expands with the peak hour, the stop-work hours and the best start), then press "Compare the crew sites". In the sort control press "Stop-work hours": the rows reorder and that figure is outlined in every row. Press "Quick look" on the Phoenix row: the row opens in place.
+2. `/site/phoenix-desert-ridge-framing` (`app/site/[slug]/page.tsx`): press "Open the full plan" (or the Phoenix row's name). The hour strip fills; hover or tab across it to show one hour's breakdown. Point at the line under the counter: the heat index reads a lower band than the sun verdict for an hour where sun WBGT says stop. On the Phoenix seed that band is "Extreme caution"; on days with a "Caution" hour it reads "Caution".
 3. Same route (`app/site/[slug]/page.tsx`): settings are workload heavy, crew 6, 2 new workers on day 2. Show them in the settings panel.
 4. Same route (`app/site/[slug]/page.tsx`): drag the shift start from 07:00 to 05:00. The rest counter rolls down and the gold "Best window" badge updates.
 5. `/site/cuiaba-soy-field-crew` (`app/site/[slug]/page.tsx`): go back and open the Cuiabá site, tomorrow's forecast site, in the southern hemisphere summer.
