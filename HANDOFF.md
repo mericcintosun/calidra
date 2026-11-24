@@ -529,6 +529,11 @@ Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run 
 - The crawl of https://calidra.vercel.app reported no console, pageerror, request, visible, data or asset findings.
 - Its only line was from `npm run proof`: `tests: passed=50 failed=0 skipped=1`. That is a pass. The one skip is `tests/heat.test.ts` "OSHA Outdoor WBGT Calculator reference points", which skips on purpose while `tests/wbgt-reference.json` is `[]`. No code change was made: filling it with invented numbers would fake a validation. Human task: enter three real OSHA calculator points (hot dry, hot humid, overcast) and the skip turns into three asserting tests.
 
+## QA: live crawl round 2 (2026-11-24)
+
+- `data` on `/site/kerman-grape-thinning`: the page read "Sample data: ... This deploy runs in sample mode." Root cause: the Vercel deploy has no `ADAPTER_MODE` set (`.farm-live.json` lists no env), and `adapterMode()` in `lib/config.ts` treated unset as fake, so every page served seed profiles without ever calling Open-Meteo. Fix: live is now the default (`adapterMode()` returns fake only for an explicit `ADAPTER_MODE=fake`); `.env.example`, README, DEMO and CLAUDE.md updated. The existing per-request seed fallback (timeout, one retry on 5xx and network errors, cache, `console.warn`) and its calm "Sample data:" sentence stay for genuine upstream failures.
+- `proof` `tests: passed=50 failed=0 skipped=1`: unchanged, same human task as round 1 (OSHA reference points in `tests/wbgt-reference.json`).
+
 ## QA: external findings
 
 - None this round.

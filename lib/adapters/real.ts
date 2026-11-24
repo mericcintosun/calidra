@@ -1,4 +1,4 @@
-// Real adapter (ADAPTER_MODE=real): seed sites, live Open-Meteo hours and geocoding.
+// Real adapter (the default; any ADAPTER_MODE but "fake"): seed sites, live Open-Meteo hours and geocoding.
 //
 // Hours are cached with unstable_cache, one entry per source, place (4 decimals) and date, for
 // 24 h on archive days and 30 min on forecast days, so the 10 rows on / cost at most 10 upstream

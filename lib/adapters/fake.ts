@@ -1,5 +1,5 @@
-// Fake adapter: everything comes from the seed module, no network. This is the default
-// (ADAPTER_MODE unset or "fake") so the first deploy renders with no outside dependency.
+// Fake adapter: everything comes from the seed module, no network. Selected only by an
+// explicit ADAPTER_MODE=fake (offline development); the default is the real Open-Meteo adapter.
 
 import type { CalidraAdapter, HoursInput } from "../adapter";
 import { findSeedSite, sites } from "../data/seed";

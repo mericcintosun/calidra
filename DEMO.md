@@ -10,7 +10,7 @@
 
 **Demo start route:** `/`
 
-Data: every step renders through `lib/adapter.ts` and the `/api/*` handlers. The default is `ADAPTER_MODE=fake`; with `ADAPTER_MODE=real` the same steps show live Open-Meteo hours and the badge on the site page says so.
+Data: every step renders through `lib/adapter.ts` and the `/api/*` handlers. The default is live Open-Meteo hours, and the badge on the site page says so; with `ADAPTER_MODE=fake` the same steps run offline from stored day profiles.
 
 ## Reset (before every run)
 

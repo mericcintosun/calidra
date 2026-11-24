@@ -52,7 +52,11 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://calidra.ve
 
 export type AdapterMode = "fake" | "real";
 
-/** ADAPTER_MODE=real selects the live Open-Meteo adapter; anything else, or unset, selects fake. */
+/**
+ * Live Open-Meteo is the default: all three APIs are keyless, so a deploy with no env set still
+ * serves real hours (and falls back to the seed profile per request if a call fails). Only an
+ * explicit ADAPTER_MODE=fake selects the offline seed adapter.
+ */
 export function adapterMode(): AdapterMode {
-  return process.env.ADAPTER_MODE === "real" ? "real" : "fake";
+  return process.env.ADAPTER_MODE?.trim().toLowerCase() === "fake" ? "fake" : "real";
 }

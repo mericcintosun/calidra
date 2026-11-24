@@ -1,8 +1,8 @@
 // The data seam. Pages and /api/* handlers ask getAdapter() for sites, hours and places and
 // never call Open-Meteo or the seed expansion directly. This is the only module that branches
 // on the mode, which comes from adapterMode() in lib/config.ts:
-//   fake (default): seed sites, seed day profiles, a small offline place list.
-//   real: seed sites, live Open-Meteo hours and geocoding, seed fallback when hours fail.
+//   real (default): seed sites, live Open-Meteo hours and geocoding, seed fallback when hours fail.
+//   fake (ADAPTER_MODE=fake): seed sites, seed day profiles, a small offline place list.
 
 import { fakeAdapter } from "./adapters/fake";
 import { realAdapter } from "./adapters/real";
