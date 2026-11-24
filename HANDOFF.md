@@ -183,3 +183,82 @@ None, agent has no shell.
 Phase 2: set up `.farm-live.json`, switch the deploy to `ADAPTER_MODE=real`, add the WBGT validation tests (Vitest, three OSHA points at ±1°C), and add `npm run proof`.
 
 Closing commit message: `faz-1: walking skeleton, adapter seam and demo contract`.
+
+---
+
+# Phase 2 handover: real WBGT engine on live Open-Meteo hours
+
+## Goal
+
+Hourly sun WBGT computed by `lib/heat.ts` from live Open-Meteo data (forecast, archive, geocoding, all keyless), fetched server-side through a timeout, retry and zod boundary, with typed `{ error, hint }` failures, honest sample vs live copy, a Vitest suite and `npm run proof`.
+
+## Status
+
+Written by reading and editing files only; nothing was installed, built, tested or run. Every item below is checked by reading the files, not by execution.
+
+**Which mechanism went real:** `getHours()` in `lib/adapters/real.ts:16-22` calls `fetchHourly()` (`lib/open-meteo.ts:36`), which goes through `fetchJson()` (`lib/http.ts:29`) and `openMeteoHourlySchema` (`lib/open-meteo.ts:47`), then the hours feed `computeHeat`, `planDay` and `findMismatch` on the server render and in `PlanView`. Place search in real mode goes through the same helper and `openMeteoGeocodeSchema` (`lib/open-meteo.ts:88`).
+
+**Still fixtures in both modes:** `listSites()` and `getSite()` serve the 10 seed sites (`lib/adapters/real.ts:14-15` delegate to the fake adapter). Fake mode `getHours()` and `searchPlaces()` stay on seed profiles and the seed city list.
+
+**`.farm-live.json` names no env keys** (`{ "requiredEnv": [], "optionalEnv": [] }`): all three Open-Meteo APIs are keyless, so the only setting, `ADAPTER_MODE`, is a mode switch the runner sets itself, not a secret.
+
+Acceptance gate, agent side (by reading):
+
+- [x] Both adapters implement the unchanged `CalidraAdapter` (`lib/adapter.ts:15-21`); `getAdapter()` selects on `adapterMode()` and defaults to fake (`lib/adapter.ts:23-25`, `lib/config.ts:43-45`).
+- [x] `.farm-live.json` valid JSON with both arrays; justified in the sentence above.
+- [x] `package.json`: `"test": "vitest run"`, `"proof": "node scripts/proof.mjs"`, `zod ^3.25.76` in dependencies, `vitest ^3.2.4` and `tsx ^4.19.2` in devDependencies. `scripts/proof.mjs` and `scripts/proof-engine.ts` exist.
+- [x] Grep README.md and `docs/` for `<PASTE`, `<fill in`, `Paste the`, `placeholder until`, `TBD`: zero hits.
+- [x] UI states sample vs live in words: `DataStatement` in `components/plan-view.tsx:389-414`, chosen from `mode` and the load source; it renders above the plan in every state and never hides the hour strip.
+- [x] Grep `app/` and `components/` for `adapters/real`, `fetchHourly`, `searchPlaces`, `seedHours`: only the adapter method call `adapter.searchPlaces(...)` in `app/api/places/route.ts:27`.
+- [x] `lib/config.ts` holds the three endpoints, `HTTP_TIMEOUT_MS`, `HTTP_RETRIES`, the three revalidate windows, `ARCHIVE_LAG_DAYS`, `LOG_PREFIX` and query limits. Its one env key, `ADAPTER_MODE`, is in `.env.example` with a comment. `process.env.ADAPTER_MODE` appears only at `lib/config.ts:44`.
+- [x] `/api/hours` (`app/api/hours/route.ts:23`) and `/api/places` (`app/api/places/route.ts:13`) call `safeParse` right after reading the URL. Schemas are exported from `lib/schemas.ts` and imported by `tests/schemas.test.ts:2`.
+- [x] No secret env name, nothing new with `NEXT_PUBLIC_`. No `"use client"` file imports `lib/config.ts`, `lib/http.ts` or `lib/open-meteo.ts`: the date helpers moved to `lib/heat.ts` and the clients import them from there.
+- [x] Every outbound fetch is in `lib/http.ts` (`AbortSignal.timeout(HTTP_TIMEOUT_MS)` at line 36, `HTTP_RETRIES + 1` attempts at line 31). No other loop retries.
+- [x] Error responses are `{ error: { error, hint } }` with `ErrorCode` from `lib/errors.ts`; status 400 for `invalid_input`, 504 for `upstream_timeout`, 502 otherwise (`statusFor`). Consumers switch on the code: `offlineLabel` in `components/plan-view.tsx`, `placeErrorMessage` and `hoursErrorMessage` in `components/new-site-form.tsx`.
+- [x] Log lines use `LOG_PREFIX` with host, status, ms, attempt, counts and lengths only (`lib/http.ts`, `lib/open-meteo.ts`, `lib/adapters/real.ts:20`). No URL, query text or body is logged.
+- [x] Imports resolve to repo files or declared dependencies (checked by reading). Seed still has 10 sites (`lib/data/seed.ts` untouched). With `ADAPTER_MODE` unset, `/` and `/site/phoenix-desert-ridge-framing` take the fake path exactly as in Phase 1.
+- [x] Stack claims: README lists Next.js 15, React 19, Tailwind 4, zod 3, Vitest 3, matching `package.json`. `/about` no longer says the APIs are called from the browser (`app/about/page.tsx:15`).
+- [x] Sameness tripwire over `app/`, `components/`, `lib/`: dead hexes, banned keyframes, `--delay`, `--d:`, `backdrop-blur`, em and en dash: zero hits. No new visual element; header untouched, one brand mark.
+
+Unmet or unverified:
+
+- **Demo contract test likely fails.** `tests/heat.test.ts:158` asserts that the Phoenix seed has a heat index "Caution" hour that WBGT calls rest or stop. By hand: the seed's coolest hour is 35.6°C at 17 percent humidity (`lib/data/seed.ts:30`, `dayShape` gives the minimum at 06:00), and the Rothfusz regression gives about 92°F there, which is "Extreme caution". Every other hour is hotter, so no hour reads "Caution" or lower and `findMismatch` should return undefined. The seed was not tuned (the spec forbids it). The test stays as the contract.
+- `npm run build`, `npm test`, `npm run proof`, the Vercel switch to real and the live spot checks: not run (no shell).
+- Whether Next's data cache stores fetches that carry an `AbortSignal` is unverified. If it does not, `/` in real mode still makes 10 upstream calls per request; the fix would be `unstable_cache` around `getHours` in `lib/adapters/real.ts`.
+
+## Decisions
+
+- **Keyless real path.** No env key besides `ADAPTER_MODE`; `requiredEnv` is empty.
+- **Retry rules.** One retry (`HTTP_RETRIES = 1`) for timeouts, network errors and 5xx. 4xx answers fail at once as `upstream_error`. A non-JSON body is `parse_failure`. A schema miss or fewer than 12 complete hours is `parse_failure`.
+- **Seed fallback kept.** Real `getHours` falls back to the fake adapter on any error and logs `[core] real hours failed code=... falling back to seed`; the page then reads "Sample data: ..." plus a line saying the live request did not come back. Real `searchPlaces` has no fallback; its errors reach the form as a code and hint.
+- **`ApiResponse.error` shape change.** `string | null` became `ApiError | null` (`{ error: ErrorCode; hint: string }`). Hints are fixed per code in `lib/errors.ts`; no raw message leaves the server. `/api/sites/[slug]` answers 404 with `invalid_input` for an unknown slug.
+- **Date window.** `hoursQuerySchema` allows 1950-01-01 to today (UTC) plus 15 days, plus one day so a browser ahead of UTC can still ask for its own "today plus 15".
+- **Date helpers moved.** `isoDate` and `resolveDate` moved from `lib/open-meteo.ts` to `lib/heat.ts` (re-exported from `lib/open-meteo.ts`) so client files never pull in the server fetch code. `pickEndpoint` stays server side; `/new` now files a sample-mode site as "archive" when its date is in the past and "forecast" otherwise.
+- **Live hours stay labeled live.** If the browser refresh fails after a live server render, `PlanView` keeps the live label instead of switching to "offline".
+- **Proof script.** `scripts/proof-engine.ts` prints one `PROOF_JSON {...}` line; `scripts/proof.mjs` runs it and `vitest --reporter=json` in parallel (90 s each, hard stop at 110 s), writes the two README blocks, and exits 0 on every path. Its temporary report lives under `node_modules/.cache/calidra-proof/` and is deleted after reading.
+
+## Failed attempts
+
+None. No error was seen, because nothing could be run.
+
+## Files changed
+
+New: `lib/config.ts`, `lib/errors.ts`, `lib/schemas.ts`, `lib/http.ts`, `vitest.config.ts`, `tests/heat.test.ts`, `tests/schemas.test.ts`, `tests/http.test.ts`, `tests/fixtures/hours.ts`, `tests/wbgt-reference.json`, `scripts/proof.mjs`, `scripts/proof-engine.ts`, `.farm-live.json`, `.farm-commits.json`.
+
+Edited: `lib/types.ts`, `lib/heat.ts`, `lib/open-meteo.ts`, `lib/adapter.ts`, `lib/adapters/real.ts`, `app/api/hours/route.ts`, `app/api/places/route.ts`, `app/api/sites/route.ts`, `app/api/sites/[slug]/route.ts`, `app/page.tsx` (comment only), `app/site/[slug]/page.tsx`, `app/new/page.tsx`, `app/about/page.tsx` (one sentence), `components/plan-view.tsx`, `components/new-site-form.tsx`, `components/site-collection.tsx` (footnote), `package.json`, `.env.example`, `README.md`, `CLAUDE.md`, `HANDOFF.md`.
+
+## Commands run
+
+None. The agent had no shell. Build, install, tests and proof are the runner's and the human's.
+
+## Open questions
+
+- **OSHA reference values.** `tests/wbgt-reference.json` is `[]`, so the OSHA test is skipped with a visible note. Enter three points from the OSHA Outdoor WBGT Calculator (hot dry, hot humid, overcast) as `{ name, tempC, rh, solarWm2, windMs, lat, lon, utc, oshaWbgtC }`; the test then asserts ±1°C. Never invent them.
+- **Phoenix mismatch unverified, and probably absent on the seed.** See "Unmet" above. Real archive hours for 19 Jul 2023 are also unlikely to show it: Phoenix that day stayed near or above 32°C all night, and sunny hours are far above the "Caution" band. `npm run proof` will print the real answer. Options for the human: point the wow line at a site where the mismatch exists (a humid morning such as Cuiabá around 08:00 to 09:00 is a candidate by hand estimate, unverified), or change the demo wording to "Extreme caution". Changing `findMismatch` or the seed to force it is out of bounds.
+- The bento CTA "Three inputs, real forecast." and the collection intro "Seven real heat days replayed from the archive" describe the days, not the data path; in sample mode they are seed profiles of those days. Not changed this phase.
+- In fake mode the Cuiabá date badge still flips from "Tomorrow" to the fixed `profileDate` after the client refresh (Phase 1 note, unchanged).
+- Builder checklist, manual: confirm student eligibility; add team names on Devpost.
+
+## Next best step
+
+Run `npm install`, `npm run build`, `npm test`, `npm run proof`, then decide the Phoenix mismatch question above. Then Phase 3: persistence for sites made on `/new`, the EN/ES print sheet with QR, and loading and error screen polish.
