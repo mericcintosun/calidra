@@ -72,7 +72,8 @@ export interface Site extends PlanSettings {
 }
 
 /** Collection filters. They live in the URL: /?q=phoenix&work=heavy&mode=archive&sort=peak */
-export type SortKey = "peak" | "rest" | "name";
+/** Collection sort: peak sun WBGT, stop-work hours in the shift, crew rest owed, or name. */
+export type SortKey = "peak" | "stops" | "rest" | "name";
 export interface CollectionFilters {
   q: string;
   work: Workload | "all";

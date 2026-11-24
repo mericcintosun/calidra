@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: { absolute: "Calidra: sun WBGT work/rest plans for outdoor crews" },
 };
 
-/** DEMO.md step 2: the Phoenix plan the largest cell links to. */
+/** DEMO.md step 2: the Phoenix plan the claim and live cells point at. */
 const DEMO_SLUG = "phoenix-desert-ridge-framing";
 
 export default async function Home({
@@ -58,30 +58,31 @@ export default async function Home({
 
   return (
     <div className="space-y-16">
-      {/* L4 bento: six unequal cells, no hero copy block above the grid. */}
+      {/* L4 bento on a 12 column grid. Cell sizes at lg (cols x rows): claim 7x2, image 5x1,
+          CTA 3x1, sun gap 2x1, live product 8x1, method 4x1. No two match; no copy above the grid. */}
       <section aria-label="Calidra at a glance" className="calidra-drop-group grid gap-3 lg:grid-cols-12">
         <Card className="flex flex-col justify-between gap-8 p-7 sm:p-9 lg:col-span-7 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <div className="space-y-5">
-            <p className="text-sm font-semibold text-gold">For outdoor crew leads in construction, farming and landscaping</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-gold" />
+              For outdoor crew leads in construction, farming and landscaping
+            </p>
             <h1 className="max-w-[16ch] text-4xl font-bold leading-[1.02] sm:text-5xl lg:text-6xl">
               Heat index assumes shade. Your crew works in the sun.
             </h1>
             <p className="max-w-[58ch] text-base text-muted-foreground sm:text-lg">
-              Calidra turns a site&apos;s hourly weather into in-sun WBGT, then gives the work and rest minutes for every
-              hour, a shorter plan for workers new this week, the shift start that loses the least time, and a one-page crew
-              sheet in English and Spanish.
+              Calidra turns tomorrow&apos;s weather into in-sun WBGT and work/rest minutes for every hour.
             </p>
-            <Button asChild size="lg">
-              <Link href={`/site/${DEMO_SLUG}`}>
-                Open the {featured.city} plan
-                <ArrowUpRight aria-hidden />
-              </Link>
-            </Button>
           </div>
           <p className="max-w-[60ch] border-l-2 border-gold pl-4 text-sm">
-            {featured.city}, {f.dateLabel}: sun WBGT reached {f.peakWbgtC.toFixed(1)}°C at {hourLabel(f.peakHour)}. A{" "}
-            {featured.crewSize}-person framing crew starting at {hourLabel(featured.shiftStart)} owed{" "}
-            {f.crewRestMin.toLocaleString("en-US")} crew-minutes of rest.
+            <Link
+              href={`/site/${DEMO_SLUG}`}
+              className="font-semibold underline decoration-primary/60 underline-offset-4 hover:decoration-primary"
+            >
+              {featured.city}, {f.dateLabel}
+            </Link>
+            : sun WBGT reached {f.peakWbgtC.toFixed(1)}°C at {hourLabel(f.peakHour)}. A {featured.crewSize}-person crew
+            starting at {hourLabel(featured.shiftStart)} owed {f.crewRestMin.toLocaleString("en-US")} crew-minutes of rest.
             {saved > 0
               ? ` Starting at ${hourLabel(f.best.start)} cuts that by ${saved.toLocaleString("en-US")}.`
               : " No other start does better."}
@@ -99,25 +100,20 @@ export default async function Home({
         </Card>
 
         <Card tone="glow" className="flex flex-col justify-between gap-5 p-6 lg:col-span-3 lg:col-start-8 lg:row-start-2">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold leading-tight">Plan tomorrow for your crew</h2>
-            <p className="text-sm text-muted-foreground">
-              City, workload, crew size.{" "}
-              {live
-                ? "Hours come from the Open-Meteo forecast or archive."
-                : "This deploy runs in sample mode, so hours come from stored day profiles."}
-            </p>
+          <h2 className="text-2xl font-semibold leading-tight">Which crew loses the most time to heat?</h2>
+          <div className="flex flex-col gap-2">
+            <Button asChild size="lg" className="w-full">
+              <Link href="#sites">Compare the crew sites</Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/new">Plan your own site</Link>
+            </Button>
           </div>
-          <Button asChild size="lg" className="w-full">
-            <Link href="/new">Plan a site</Link>
-          </Button>
         </Card>
 
         <Card tone="deep" className="flex flex-col justify-between gap-3 p-6 lg:col-span-2 lg:col-start-11 lg:row-start-2">
           <p className="font-display text-5xl font-bold text-primary">15°F</p>
-          <p className="text-sm text-muted-foreground">
-            How far OSHA says the heat index can read low in full sun. WBGT counts the sun.
-          </p>
+          <p className="text-sm text-muted-foreground">How far OSHA says the heat index can read low in full sun.</p>
         </Card>
 
         <Card className="p-6 lg:col-span-8 lg:col-start-1 lg:row-start-3">
@@ -128,8 +124,7 @@ export default async function Home({
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold leading-tight">Physics, not a lookup table</h2>
             <p className="text-sm text-muted-foreground">
-              Globe and natural wet bulb temperatures are solved by iteration from temperature, humidity, sunlight and
-              wind, every hour, by Calidra&apos;s own engine.
+              Globe and wet bulb temperatures are solved by iteration from sun, wind, heat and humidity, every hour.
             </p>
           </div>
           <Link
@@ -142,8 +137,8 @@ export default async function Home({
         </Card>
       </section>
 
-      <section id="sites" aria-labelledby="sites-title" className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <section id="sites" aria-labelledby="sites-title" className="scroll-mt-24 space-y-6">
+        <div className="flex items-end justify-between gap-6">
           <div className="space-y-1">
             <h2 id="sites-title" className="text-3xl font-bold">
               Crew sites
@@ -151,9 +146,16 @@ export default async function Home({
             <p className="max-w-[65ch] text-muted-foreground">
               {live
                 ? "Seven past heat days from the Open-Meteo archive and three southern hemisphere sites on tomorrow's forecast."
-                : "Seven past heat days and three southern hemisphere sites, drawn from stored sample day profiles in this deploy."}{" "}
-              Each strip is 24 hours; the bright stretch is the planned shift.
+                : "Seven past heat days and three southern hemisphere sites, from stored sample day profiles in this deploy."}
             </p>
+          </div>
+          <div className="w-28 shrink-0 overflow-hidden rounded-2xl border border-line bg-deep sm:w-40">
+            <SceneSlot
+              n={5}
+              alt="A sun disc hanging over a 24 hour strip of colored bars, green at dawn, gold and coral at midday, with a small clock face at the side"
+              width={640}
+              height={600}
+            />
           </div>
         </div>
         <SiteCollection seeds={summaries} initial={initial} />

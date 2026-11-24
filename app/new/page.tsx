@@ -17,9 +17,10 @@ export default function NewSitePage() {
         <div className="space-y-2">
           <h1 className="text-4xl font-bold sm:text-5xl">Plan a site</h1>
           <p className="max-w-[62ch] text-muted-foreground">
+            Pick a town and a day; Calidra saves the 24 hour plan in this browser.{" "}
             {live
-              ? "Pick the town and the day. Calidra gets 24 hours of temperature, humidity, sunlight and wind from Open-Meteo, saves them with your site, and adds it to the crew sites list in this browser. If Open-Meteo does not answer, the nearest stored day profile stands in and the site says so."
-              : "Pick the town and the day. This deploy runs in sample mode: the 24 hours come from the nearest stored day profile, not a live weather feed. Calidra saves them with your site and adds it to the crew sites list in this browser."}
+              ? "Hours come from Open-Meteo, or the nearest stored day profile if it does not answer."
+              : "This deploy runs in sample mode, so hours come from the nearest stored day profile."}
           </p>
         </div>
         <NewSiteForm />

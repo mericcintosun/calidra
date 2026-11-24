@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -54,16 +55,17 @@ export function SiteNav() {
       <nav aria-label="Main" className="hidden items-center gap-1 text-sm font-medium md:flex">
         {links(false)}
       </nav>
-      <button
+      <Button
         type="button"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-line bg-surface text-foreground transition-colors hover:bg-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+        variant="outline" size="icon"
+        className="md:hidden"
         aria-expanded={open}
         aria-controls={PANEL_ID}
         onClick={() => setOpen((o) => !o)}
       >
-        {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
+        {open ? <X aria-hidden /> : <Menu aria-hidden />}
         <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
-      </button>
+      </Button>
       <nav
         id={PANEL_ID}
         aria-label="Main, small screens"

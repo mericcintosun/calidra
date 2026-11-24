@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SceneSlot } from "@/components/scene-slot";
 import { Card } from "@/components/ui/card";
+import { Disclosure } from "@/components/ui/disclosure";
 import { ACTION_LIMIT, CLOTHING, CLOTHING_KEYS, REST_WATTS, TLV, WORKLOADS, WORKLOAD_KEYS, limitAt } from "@/lib/heat";
 
 export const metadata: Metadata = {
@@ -38,17 +39,16 @@ const STEPS = [
 
 export default function AboutPage() {
   return (
-    <div className="space-y-12">
-      <div className="calidra-drop grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-center">
+    <div className="calidra-drop-group space-y-12">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-center">
         <div className="space-y-4">
           <h1 className="text-4xl font-bold sm:text-5xl">How Calidra gets from a forecast to a break schedule</h1>
           <p className="max-w-[66ch] text-muted-foreground">
-            The free heat tools most crew leads use rely on the heat index, which is computed for shade and a light breeze.
-            OSHA notes that full sun can add up to 15°F and names WBGT as the better measure. Calidra estimates WBGT in the
-            sun from standard weather data, hour by hour, without a meter.
+            The heat index is computed for shade, so Calidra estimates WBGT in the sun from standard weather data, hour by
+            hour, without a meter.
           </p>
         </div>
-        <Card tone="deep" className="overflow-hidden p-0">
+        <Card tone="glow" className="overflow-hidden p-0">
           <SceneSlot
             n={2}
             alt="Cutaway drawing of a black globe thermometer and a wet-wick thermometer side by side under a bright sun, with arrows for sunlight, wind and evaporation"
@@ -65,18 +65,19 @@ export default function AboutPage() {
         <ol className="space-y-3">
           {STEPS.map((s, i) => (
             <li key={s.title}>
-              <Card className="p-0">
-                <details className="group p-5">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-start gap-4 rounded-xl [&::-webkit-details-marker]:hidden">
+              <Disclosure
+                summary={
+                  <span className="flex items-start gap-4">
                     <span className="font-display text-2xl font-bold text-gold">{i + 1}</span>
                     <span className="space-y-1">
                       <span className="block font-display text-lg font-semibold">{s.title}</span>
                       <span className="block text-sm text-muted-foreground">{s.summary}</span>
                     </span>
-                  </summary>
-                  <p className="mt-3 max-w-[70ch] pl-10 text-sm leading-relaxed">{s.body}</p>
-                </details>
-              </Card>
+                  </span>
+                }
+              >
+                <p className="max-w-[70ch] pl-10 text-sm leading-relaxed">{s.body}</p>
+              </Disclosure>
             </li>
           ))}
         </ol>
@@ -86,8 +87,14 @@ export default function AboutPage() {
         <h2 id="limits-table" className="text-3xl font-bold">
           The thresholds in use
         </h2>
+        <p className="max-w-[70ch] text-muted-foreground">
+          Heavy work at {WORKLOADS.heavy.watts} W stops being continuous above{" "}
+          {limitAt(WORKLOADS.heavy.watts, TLV).toFixed(1)}°C WBGT for a veteran and{" "}
+          {limitAt(WORKLOADS.heavy.watts, ACTION_LIMIT).toFixed(1)}°C for a new worker.
+        </p>
+        <Disclosure summary={<span className="font-semibold">Show the threshold table for all four workloads</span>}>
         {/* The table keeps its columns and scrolls inside this wrapper on narrow screens. */}
-        <Card tone="glow" className="max-w-full overflow-x-auto p-0">
+        <Card tone="deep" className="max-w-full overflow-x-auto p-0">
           <table className="w-full min-w-[34rem] text-left text-sm">
             <thead className="border-b border-line text-muted-foreground">
               <tr>
@@ -112,15 +119,16 @@ export default function AboutPage() {
             </tbody>
           </table>
         </Card>
-        <p className="max-w-[70ch] text-sm text-muted-foreground">
+        <p className="mt-4 max-w-[70ch] text-sm text-muted-foreground">
           Clothing adjustments added to WBGT:{" "}
           {CLOTHING_KEYS.map((k) => `${CLOTHING[k].label.toLowerCase()} +${CLOTHING[k].cav}°C`).join(", ")}. Curves:
           TLV = {TLV.intercept} − {TLV.slope} log10(M), action limit = {ACTION_LIMIT.intercept} − {ACTION_LIMIT.slope}{" "}
           log10(M), M in watts.
         </p>
+        </Disclosure>
       </section>
 
-      <section aria-labelledby="limits" className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <section aria-labelledby="limits" className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)]">
         <Card className="space-y-3 p-6">
           <h2 id="limits" className="text-2xl font-bold">
             Limits we know about
@@ -142,6 +150,15 @@ export default function AboutPage() {
             <li>NWS Rothfusz heat index regression with its low and high humidity adjustments.</li>
             <li>Open-Meteo forecast, historical and geocoding APIs (CC BY 4.0).</li>
           </ul>
+        </Card>
+        <Card tone="deep" className="overflow-hidden p-0">
+          <SceneSlot
+            n={6}
+            alt="A crew of three resting on a bench under a striped shade canopy in late afternoon, a water jug between them and a low sun behind the frame of a house"
+            width={720}
+            height={720}
+            className="h-full object-cover"
+          />
         </Card>
       </section>
     </div>

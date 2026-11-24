@@ -17,6 +17,6 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
     q: one(sp.q).slice(0, 60),
     work: (WORK_KEYS as string[]).includes(work) ? (work as Workload) : "all",
     mode: mode === "archive" || mode === "forecast" ? mode : "all",
-    sort: sort === "rest" || sort === "name" ? sort : "peak",
+    sort: sort === "stops" || sort === "rest" || sort === "name" ? sort : "peak",
   };
 }
