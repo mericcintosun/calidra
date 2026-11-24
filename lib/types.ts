@@ -1,6 +1,10 @@
 // Shared types for Calidra. lib/data.ts and lib/open-meteo.ts re-export these so older
 // import paths keep working.
 
+import type { ApiError } from "./errors";
+
+export type { ApiError, ErrorCode } from "./errors";
+
 export type Workload = "light" | "moderate" | "heavy" | "veryHeavy";
 export type Clothing = "workClothes" | "polyolefin" | "doubleLayer" | "vaporBarrier";
 export type SiteMode = "archive" | "forecast";
@@ -97,10 +101,10 @@ export interface Place {
   elevation?: number;
 }
 
-/** The one JSON shape every /api/* handler returns. */
+/** The one JSON shape every /api/* handler returns. `error` is a code plus a fixed hint. */
 export interface ApiResponse<T> {
   ok: boolean;
   data: T | null;
-  error: string | null;
+  error: ApiError | null;
   source: "seed" | "forecast" | "archive";
 }
