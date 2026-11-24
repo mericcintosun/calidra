@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Range } from "@/components/ui/range";
+import { hintFor, type ApiError } from "@/lib/errors";
 import type { ApiResponse, HourlyResult, HourlyWeather, PlanSettings, Site, WeatherSource } from "@/lib/types";
 import {
   CLOTHING,
@@ -25,32 +26,42 @@ import {
   formatSiteDate,
   hourLabel,
   planDay,
+  resolveDate,
   shiftTotals,
   type HourPlan,
 } from "@/lib/heat";
-import { resolveDate } from "@/lib/open-meteo";
 import { findLocalSite } from "@/lib/site-store";
 import { cn } from "@/lib/utils";
+
+/** The adapter mode of this deploy, passed down from the server page. */
+export type DataMode = "fake" | "real";
 
 type LoadState =
   | { kind: "loading" }
   | { kind: "live"; source: WeatherSource; date: string }
   | { kind: "saved" }
-  | { kind: "offline"; reason: string };
+  | { kind: "offline"; error: ApiError };
+
+type HoursOutcome = { ok: true; data: HourlyResult } | { ok: false; error: ApiError };
 
 /** Hours for a site through the adapter seam: /api/hours answers with the shared ApiResponse shape. */
-async function loadHours(site: Site, signal: AbortSignal): Promise<HourlyResult> {
+async function loadHours(site: Site, signal: AbortSignal): Promise<HoursOutcome> {
   const qs = new URLSearchParams({
     slug: site.slug,
     lat: String(site.lat),
     lon: String(site.lon),
     date: resolveDate(site.date),
   });
-  const res = await fetch(`/api/hours?${qs.toString()}`, { signal });
-  if (!res.ok) throw new Error(`Hours answered ${res.status}`);
-  const body = (await res.json()) as ApiResponse<HourlyResult>;
-  if (!body.ok || !body.data) throw new Error(body.error ?? "No hours returned");
-  return body.data;
+  let body: ApiResponse<HourlyResult> | null = null;
+  try {
+    const res = await fetch(`/api/hours?${qs.toString()}`, { signal });
+    body = (await res.json()) as ApiResponse<HourlyResult>;
+  } catch {
+    body = null;
+  }
+  if (!body) return { ok: false, error: { error: "upstream_error", hint: hintFor("upstream_error") } };
+  if (!body.ok || !body.data) return { ok: false, error: body.error ?? { error: "parse_failure", hint: hintFor("parse_failure") } };
+  return { ok: true, data: body.data };
 }
 
 /** The site detail: hours from the adapter, settings, the shift slider and the counter it moves. */
@@ -58,10 +69,12 @@ export function PlanView({
   site,
   initialHours,
   initialSource,
+  mode,
 }: {
   site: Site;
   initialHours: HourlyWeather[];
   initialSource?: WeatherSource;
+  mode?: DataMode;
 }) {
   const [hours, setHours] = useState<HourlyWeather[]>(initialHours);
   // Sites made on /new keep the hours saved at creation and do not refetch.
@@ -89,15 +102,17 @@ export function PlanView({
   useEffect(() => {
     if (hasSnapshot) return;
     const ctrl = new AbortController();
-    loadHours(site, ctrl.signal)
-      .then((r) => {
-        if (r.hours.length > 0) setHours(r.hours);
-        setLoad({ kind: "live", source: r.source, date: r.date });
-      })
-      .catch((e: unknown) => {
-        if (ctrl.signal.aborted) return;
-        setLoad({ kind: "offline", reason: e instanceof Error ? e.message : "network error" });
-      });
+    void loadHours(site, ctrl.signal).then((r) => {
+      if (ctrl.signal.aborted) return;
+      if (!r.ok) {
+        // Live hours already on screen from the server render stay labeled live.
+        const error = r.error;
+        setLoad((prev) => (prev.kind === "live" && prev.source !== "seed" ? prev : { kind: "offline", error }));
+        return;
+      }
+      if (r.data.hours.length > 0) setHours(r.data.hours);
+      setLoad({ kind: "live", source: r.data.source, date: r.data.date });
+    });
     return () => ctrl.abort();
     // Site fields are listed one by one so a new object for the same place does not refetch.
   }, [site.slug, site.lat, site.lon, site.date, hasSnapshot]);
@@ -124,6 +139,7 @@ export function PlanView({
           <Badge variant="secondary">{load.kind === "live" ? formatSiteDate(load.date) : formatSiteDate(site.date)}</Badge>
           <SourceBadge load={load} />
         </div>
+        <DataStatement load={load} mode={mode} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
@@ -348,10 +364,52 @@ function SourceBadge({ load }: { load: LoadState }) {
   if (load.kind === "live")
     return <Badge variant="ok">{load.source === "archive" ? "Open-Meteo historical archive" : "Open-Meteo forecast"}</Badge>;
   return (
-    <Badge variant="warn" title={load.reason}>
-      Offline: stored day profile
+    <Badge variant="warn" title={load.error.hint}>
+      {offlineLabel(load.error)}
     </Badge>
   );
+}
+
+/** Badge text for a failed refresh, chosen by error code, never by message text. */
+function offlineLabel(error: ApiError): string {
+  switch (error.error) {
+    case "upstream_timeout":
+      return "Weather timed out: stored day profile";
+    case "invalid_input":
+      return "Request rejected: stored day profile";
+    case "parse_failure":
+      return "Weather unreadable: stored day profile";
+    case "upstream_error":
+    case "not_configured":
+    default:
+      return "Offline: stored day profile";
+  }
+}
+
+const SAMPLE_SENTENCE = "Sample data: these hours come from a stored day profile, not a live weather feed.";
+
+/**
+ * One plain sentence saying what the hour strip is built from, picked from the deploy's adapter
+ * mode and the source of the hours on screen. A real-mode fallback to seed reads as sample data.
+ */
+function DataStatement({ load, mode }: { load: LoadState; mode?: DataMode }) {
+  let text: string;
+  if (load.kind === "loading") {
+    text = "Checking where this site's hours come from.";
+  } else if (load.kind === "saved") {
+    text = "Saved data: these hours were stored in this browser when the site was created. The note above names their source.";
+  } else if (load.kind === "live" && load.source !== "seed") {
+    text = `Live data: hours from the Open-Meteo ${
+      load.source === "archive" ? "historical archive" : "forecast"
+    }, solved to WBGT in this site's engine.`;
+  } else if (mode === "real") {
+    text = `${SAMPLE_SENTENCE} The live Open-Meteo request did not come back, so this is the fallback.`;
+  } else if (load.kind === "offline") {
+    text = `${SAMPLE_SENTENCE} ${load.error.hint}`;
+  } else {
+    text = `${SAMPLE_SENTENCE} This deploy runs in sample mode.`;
+  }
+  return <p className="max-w-[70ch] text-sm text-muted-foreground">{text}</p>;
 }
 
 function SettingGroup({ label, children }: { label: string; children: React.ReactNode }) {

@@ -118,8 +118,9 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
         )}
       </ul>
       <p className="max-w-[70ch] text-xs text-muted-foreground">
-        Row figures run each site&apos;s hours through the same WBGT engine as the site page. Open a site for the full
-        hour-by-hour plan; its badge says whether the hours are seed data or live Open-Meteo.
+        Row figures run each site&apos;s hours through the same WBGT engine as the site page: live Open-Meteo hours
+        when this deploy runs live, stored day profiles when it runs in sample mode or a request fails. Open a site
+        for the full hour-by-hour plan; it says in words which of the two is on screen.
       </p>
     </div>
   );

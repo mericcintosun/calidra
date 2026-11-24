@@ -12,7 +12,7 @@ const STEPS = [
   {
     title: "Hourly weather from Open-Meteo",
     summary: "Temperature, humidity, sunlight, wind, cloud and pressure for the 24 hours of the chosen day.",
-    body: "Past days come from the Open-Meteo historical archive (reanalysis), recent and future days from the Open-Meteo forecast. Both are free, keyless and called straight from your browser. Place names are resolved with the Open-Meteo geocoding API.",
+    body: "Past days come from the Open-Meteo historical archive (reanalysis), recent and future days from the Open-Meteo forecast. Both are free and keyless, and are called from this site's server when it runs in live mode; in sample mode a stored day profile stands in and the site page says so. Place names are resolved with the Open-Meteo geocoding API.",
   },
   {
     title: "Where the sun is",
