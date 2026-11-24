@@ -8,7 +8,8 @@
     "start": "next start",
     "seed": "node scripts/seed.mjs",
     "test": "vitest run",
-    "proof": "node scripts/proof.mjs"
+    "proof": "node scripts/proof.mjs",
+    "demo:reset": "node scripts/demo-reset.mjs"
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.11.0",

@@ -262,3 +262,82 @@ None. The agent had no shell. Build, install, tests and proof are the runner's a
 ## Next best step
 
 Run `npm install`, `npm run build`, `npm test`, `npm run proof`, then decide the Phoenix mismatch question above. Then Phase 3: persistence for sites made on `/new`, the EN/ES print sheet with QR, and loading and error screen polish.
+
+---
+
+# Phase 3 handover: demo path on real data, browser persistence, state triad, reset
+
+## Goal
+
+Every DEMO.md step (1 to 7) runs on the real adapter flow with a named fallback, in under 5 s; `demo:reset` returns the browser state to the demo start; step 6 is duplicate-safe and reset-safe; step 2's gap line is true on real hours.
+
+## Status
+
+Written by reading and editing files only. Nothing was installed, built, tested or run. Every item is checked by reading or Grep, not by execution.
+
+Acceptance gate, agent side:
+
+- [x] Every DEMO.md step names a real path file and a fallback file: section "Real path and fallback" in `DEMO.md`. The fallback branch is code in `lib/adapters/real.ts:84` (`return fakeAdapter.getHours(site, date);` inside `realAdapter.getHours`). Step 6 place search has no server fallback; the Phoenix preset (`presetPhoenix` in `components/new-site-form.tsx`) is the documented fallback.
+- [x] Persistence only in `lib/site-store.ts`. Grep `localStorage` over `app/`, `components/`, `lib/` hits only `lib/site-store.ts` (lines 1, 2, 67, 119, 140, 147, 164). The copy line on `/new` that said "localStorage" now says "saved in this browser only" (`app/new/page.tsx:43`).
+- [x] No runtime `fs` write: Grep `node:fs|from "fs"|writeFile` over `app/`, `components/`, `lib/` finds nothing. `fs` stays in `scripts/` and `next.config.ts` (build time, unchanged).
+- [x] No new secret: `.env.example` has no new key, only a comment line that Phase 3 added none; no `NEXT_PUBLIC_` store variable. `.farm-live.json` unchanged.
+- [x] `components/states.tsx` exports `PageSkeleton` (line 12), `SitePlanSkeleton` (31), `ErrorState` (57, its Button calls `onRetry` at line 76), `EmptyState` (88, `href` link or `onAction` button). See the state table below.
+- [x] `NewSiteForm`: submit `disabled={busy}` (`components/new-site-form.tsx:329`) with `const busy = status.kind === "busy"` (208); `savingRef` guard (91, checked at 119, set at 124, cleared in `finally` at 128); `siteKey(...)` (147) feeds `slugify(crewName, key)` (158); `saveLocalSite(site)` (182) returns `created`, `duplicate` (replace by slug, moved to top) or `failed` with `quota` or `unavailable`.
+- [x] `findBandGap` in `lib/heat.ts:331`, used in `components/plan-view.tsx:140`, tested in `tests/heat.test.ts:160` and `:180`. `findMismatch` body (`lib/heat.ts:314-316`) unchanged.
+- [x] `components/scene-slot.tsx:1` imports `next/image`; the eslint-disable line is gone. `components/brand-mark.tsx` also moved to `next/image` (it held the last `<img`). Grep `<img` over `app/` and `components/`: no hits.
+- [x] `components/plan-view.tsx` has three `useEffect` calls (112, 461, 493). The hours effect (112) makes one fetch, and only when `retry > 0`, no hours came from the server, or in real mode after a seed fallback or a date mismatch (`realNeedsLive`, 114 to 116). No fetch is chained inside another fetch's `.then`.
+- [x] `demo:reset` in `package.json`; `scripts/demo-reset.mjs` (spawnSync of `scripts/seed.mjs`, prints `/?demo-reset=1` and the start route); `components/demo-reset.tsx` mounted once in `app/layout.tsx:23`, outside the header. README "Demo reset" and DEMO.md "Reset" document both.
+- [x] No new API route and no new page route; `/api/hours` and `/api/places` validation untouched.
+- [x] Added imports resolve: `next/cache`, `next/image`, `next/navigation` (from `next`), `zod` (dependency), `@/components/states`, `@/components/demo-reset`, `@/lib/site-store`. Seed untouched, 10 sites.
+- [x] Sameness tripwire over `app/`, `components/`, `lib/`: dead hexes, banned keyframes, `--delay`, `--d:`, `backdrop-blur`, em and en dash: no hits. `#[0-9a-fA-F]{6}` only in `app/globals.css`, `app/opengraph-image.tsx`, `app/icon.svg`. No new visual pattern from the ban list. Header untouched, one brand mark.
+
+Unverified (needs the runner or the human): `npm run build`, `npm test`, `npm run proof` (the `demo-path` README block holds an honest "Not run in this build" line until then), the 3 x 7 step walk under 5 s, the duplicate click check on the live URL.
+
+### State triad by route
+
+| Route | File | Skeleton | Error | Empty |
+| --- | --- | --- | --- | --- |
+| `/` | `app/page.tsx`, `components/site-collection.tsx` | `app/loading.tsx` (`PageSkeleton`) | `app/error.tsx` (`ErrorState` with `reset`, link to `/`) | `app/page.tsx:36` (`EmptyState`, CTA `/new`); `components/site-collection.tsx:115` (`EmptyState` with `onAction` "Clear filters") |
+| `/site/[slug]` | `app/site/[slug]/page.tsx`, `components/plan-view.tsx` | `app/site/[slug]/loading.tsx` (`SitePlanSkeleton`); `StoredSitePlan` loading (`PageSkeleton`, plan-view 498) | `app/site/[slug]/error.tsx` (`ErrorState` with `reset`); offline hours: "Retry live hours" button (plan-view 166) | empty plan `EmptyState` (plan-view 309, CTA `/new`); `StoredSitePlan` missing `EmptyState` (plan-view 501) |
+| `/new` | `app/new/page.tsx`, `components/new-site-form.tsx` | `app/new/loading.tsx` (`PageSkeleton`) | `app/new/error.tsx` (`ErrorState`); place search and hours errors show "Try again" (re-runs the search or the save) | "No place called ..." panel with a button that fills the Phoenix preset (new-site-form 274) |
+| `/about` | `app/about/page.tsx` | `app/about/loading.tsx` (`PageSkeleton`) | root `app/error.tsx` (static page) | not applicable, static content |
+
+## Decisions
+
+- **Store: browser localStorage, wrapped only by `lib/site-store.ts`.** Demo need: "one small mutable state", read in the same browser (steps 6 and 1); client-side variant of that row. Rejected: KV (needs a secret the builder cannot supply; no demo step reads from another device), Postgres (no relational reads), on-chain (nothing to settle). The old TODO is now a documented limit in the file header and README "Persistence": not shared across devices.
+- **Idempotency is client side.** There is no server write route, so the check is `siteKey` (djb2 hash of name, lat, lon, date, workload, crew size, new workers, shift start) in the slug plus `saveLocalSite` replacing a record with the same slug, plus the `savingRef` and `disabled` guards against double submit. `slugify` lost its `Date.now()` suffix.
+- **Stored data is validated.** `storedSiteSchema` (zod, in `lib/site-store.ts`, mirrors `Site` from `lib/types.ts` without importing server files); `parseStoredSites` drops invalid entries and never throws.
+- **Gap line.** `findBandGap` returns, among rest or stop hours, the lowest heat index band, earliest hour on ties. `PlanView` uses `findMismatch(shift) ?? findMismatch(plan) ?? findBandGap(plan)`; the sentence prints the real band, so on the Phoenix seed it reads "Extreme caution" against "stop". The old Phoenix `findMismatch` assertion became a `findBandGap` assertion; `findMismatch` keeps a hand-built "Caution" plus `stop` test.
+- **Cache and budget.** `lib/adapters/real.ts` wraps `fetchHourly` in two `unstable_cache` functions (`["calidra-hours", "archive" | "forecast"]` plus the call arguments lat4, lon4, date; revalidate `ARCHIVE_REVALIDATE_S` or `FORECAST_REVALIDATE_S`), after `resolveDate` and `pickEndpoint`. Each call races `HOURS_BUDGET_MS = 4000` (`lib/config.ts`); a timeout logs `[core] real hours failed reason=budget ...` and serves the seed profile. Outside a Next.js server (the proof script), `unstable_cache` throws "incrementalCache missing", so `cachedHours` calls `fetchHourly` directly in that one case.
+- **No duplicate client fetch.** `PlanView` takes `initialDate` from `app/site/[slug]/page.tsx` and only refetches in the cases listed above. Fake mode never refetches, which also ends the Cuiabá "Tomorrow" badge flip from the Phase 1 notes.
+- **Reset.** `?demo-reset=1` is read from `window.location` (no `useSearchParams`, no Suspense). `clearLocalSites` fires a `calidra:sites-changed` window event that `SiteCollection` listens to, because `router.refresh()` keeps client state and the collection's list would otherwise stay stale until a reload.
+- **Scope asks.** No new dependency, env variable, API route or page route was needed.
+
+## Failed attempts
+
+None seen; nothing could be run.
+
+## Files changed
+
+New: `components/states.tsx`, `components/demo-reset.tsx`, `app/site/[slug]/error.tsx`, `app/new/error.tsx`, `scripts/demo-reset.mjs`, `tests/site-store.test.ts`, `.farm-commits.json`.
+
+Edited: `lib/heat.ts`, `lib/site-store.ts`, `lib/config.ts`, `lib/adapters/real.ts`, `components/plan-view.tsx`, `components/new-site-form.tsx`, `components/site-collection.tsx`, `components/scene-slot.tsx`, `components/brand-mark.tsx`, `app/page.tsx`, `app/error.tsx`, `app/loading.tsx`, `app/site/[slug]/loading.tsx`, `app/site/[slug]/page.tsx`, `app/new/loading.tsx`, `app/new/page.tsx` (one copy line), `app/about/loading.tsx`, `app/layout.tsx`, `tests/heat.test.ts`, `scripts/proof-engine.ts`, `scripts/proof.mjs`, `package.json`, `README.md`, `DEMO.md`, `CLAUDE.md`, `.env.example`, `HANDOFF.md`.
+
+## Commands run
+
+None. The agent had no shell.
+
+## Open questions
+
+- Whether `next/cache` imports cleanly under `tsx` (the proof script). If the import fails, the demo-path block reads "Not run in this build: the adapter module could not load outside Next.js", and the live-weather block still runs.
+- The "incrementalCache missing" detection in `cachedHours` matches Next 15's error text; if a later Next changes it, the proof script falls back to seed (the live site is unaffected).
+- `components/brand-mark.tsx` was changed to `next/image` to meet the no-`<img` rule; it was not in the Phase 3 file list. Check the header mark renders at 28 px.
+- Whether the Phoenix live archive day shows a "Caution" hour (unlikely); either way the line now shows a true band through `findBandGap`. `npm run proof` reports it.
+- Still open from Phase 2: OSHA reference values in `tests/wbgt-reference.json` (human task), the two bento copy lines about "real forecast" in sample mode.
+- Builder checklist, manual: confirm student eligibility; add team names on Devpost.
+
+## Next best step
+
+Phase 4: EN/ES print sheet with QR, plan settings in the URL, hover breakdown, `layoutId` morph and signature 3, landing and OG polish.
+
+Closing commit message: `faz-3: demo path on real data, browser store, state triad and reset`.

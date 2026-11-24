@@ -8,7 +8,8 @@ Read `IDENTITY.md` (binding for colors, fonts, routes, motion), then `HANDOFF.md
 - `npm run build` (must stay green after every change)
 - `npm run dev` (http://localhost:3000)
 - `npm run seed` (checks that seed slugs in `lib/data/seed.ts` are unique and that 8 or more sites exist; writes nothing)
-- `npm test` (Vitest, offline: `tests/heat.test.ts`, `tests/schemas.test.ts`, `tests/http.test.ts`)
+- `npm test` (Vitest, offline: `tests/heat.test.ts`, `tests/schemas.test.ts`, `tests/http.test.ts`, `tests/site-store.test.ts`)
+- `npm run demo:reset` (seed check, then prints the reset URL `/?demo-reset=1` that clears browser-saved sites)
 - `npm run proof` (one live Open-Meteo call plus the test run; rewrites the PROOF blocks in README.md, exits 0 even offline)
 
 ## Data seam
