@@ -25,6 +25,7 @@ Data: every step renders through `lib/adapter.ts` and the `/api/*` handlers. The
 5. `/site/cuiaba-soy-field-crew` (`app/site/[slug]/page.tsx`): go back and open the Cuiabá site, tomorrow's forecast site, in the southern hemisphere summer.
 6. `/new` (`app/new/page.tsx`): search "Cuiab" or press "Fill with Phoenix, 19 Jul 2023", save. The new site appears at the top of `/` with a "Yours" badge. Saving the same inputs again (or a double click) leaves one row.
 7. `/about` (`app/about/page.tsx`): the method, the threshold table computed from the engine, and the limits.
+8. `/site/[slug]/print` (`app/site/[slug]/print/page.tsx`): open `/site/phoenix-desert-ridge-framing`, drag the start to 05:00, press "Crew sheet". The address becomes `/site/phoenix-desert-ridge-framing/print?workload=heavy&clothing=workClothes&crew=6&newWorkers=2&day=2&start=5&hours=8`: a one-page day plan for heavy work, crew 6, 2 new workers, start 05:00, with rest minutes per hour, the total rest owed and the best window. Press "Español" and the same numbers come back in Spanish; press "Print" for paper. The QR code opens `/site/phoenix-desert-ridge-framing` with the same settings.
 
 ## Real path and fallback
 
@@ -37,5 +38,4 @@ Each step names the file with the real path and the file with its fallback. Ever
 5. Cuiabá forecast: real path `lib/adapters/real.ts` (forecast cache, 30 min); fallback `lib/adapters/real.ts` to `fakeAdapter.getHours`.
 6. Save on `/new`: real path `app/api/places/route.ts` (geocoding) and `app/api/hours/route.ts` through `lib/adapters/real.ts`, stored by `lib/site-store.ts`. Place search has no server fallback, so the "Fill with Phoenix, 19 Jul 2023" preset in `components/new-site-form.tsx` is the documented fallback; the hours call falls back to `fakeAdapter.getHours` like the steps above.
 7. `/about`: static page, no data call; real path `app/about/page.tsx`, fallback not needed (root `app/error.tsx` covers a render error).
-
-Planned, no route yet: a printable EN/ES crew sheet with a QR code back to the live plan (Phase 4).
+8. Crew sheet: real path `lib/adapters/real.ts` hours through `lib/print-sheet.ts` (`buildSheet`, built on `planDay`, `shiftTotals`, `bestStart`), settings from the URL through `lib/plan-params.ts`, QR from `qrcode` on the server; fallback `lib/adapters/real.ts` to `fakeAdapter.getHours` in `lib/adapters/fake.ts`. If the QR cannot be made, the plan URL printed under its spot still opens the same plan.
