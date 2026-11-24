@@ -524,6 +524,15 @@ None. The agent had no shell.
 
 Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run proof`, then commit from `.farm-commits.json` and redeploy. Then Phases 6 and 7: judge rounds, freeze and tag.
 
+## QA: live crawl round 1 (2026-11-24)
+
+- The crawl of https://calidra.vercel.app reported no console, pageerror, request, visible, data or asset findings.
+- Its only line was from `npm run proof`: `tests: passed=50 failed=0 skipped=1`. That is a pass. The one skip is `tests/heat.test.ts` "OSHA Outdoor WBGT Calculator reference points", which skips on purpose while `tests/wbgt-reference.json` is `[]`. No code change was made: filling it with invented numbers would fake a validation. Human task: enter three real OSHA calculator points (hot dry, hot humid, overcast) and the skip turns into three asserting tests.
+
+## QA: external findings
+
+- None this round.
+
 ## Manual submit checklist (human)
 
 - [ ] Every team member is a student and above the age of majority where they live.

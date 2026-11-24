@@ -99,13 +99,13 @@ Ran on 2026-11-24: lib/print-sheet.ts built the Phoenix sheet (workload=heavy&cl
 Written by `npm run proof` (`scripts/proof.mjs`). Live weather: one archive call for Phoenix on 19 Jul 2023 through `lib/open-meteo.ts`, then the WBGT engine, the heavy-work planner and the heat index mismatch search.
 
 <!-- PROOF:BEGIN live-weather -->
-Ran on 2026-11-24: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 263 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
+Ran on 2026-11-24: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 266 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
 <!-- PROOF:END live-weather -->
 
 Demo path: `getHours` timed through `getAdapter()` in real mode for the two demo sites, with the source that came back and the heat index band gap hour from `findBandGap`.
 
 <!-- PROOF:BEGIN demo-path -->
-Ran on 2026-11-24 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 69 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-25: 24 hours from live forecast in 178 ms, band gap at 09:00 (heat index Extreme caution, rest). Every call finished under 5 s.
+Ran on 2026-11-24 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 61 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-25: 24 hours from live forecast in 179 ms, band gap at 09:00 (heat index Extreme caution, rest). Every call finished under 5 s.
 <!-- PROOF:END demo-path -->
 
 Tests:
