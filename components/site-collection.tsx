@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/states";
 import type { CollectionFilters, SortKey } from "@/lib/data";
 import { STATUS_FILL, WORKLOADS, WORKLOAD_KEYS, hourLabel, summarizeSite, type SiteSummary } from "@/lib/heat";
-import { loadLocalSites } from "@/lib/site-store";
+import { SITES_CHANGED_EVENT, loadLocalSites } from "@/lib/site-store";
 import { cn } from "@/lib/utils";
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -31,7 +32,11 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
 
   useEffect(() => {
     // Sites made on /new carry the hours saved when they were created.
-    setLocal(loadLocalSites().map((s) => summarizeSite(s, s.snapshot ?? [])));
+    const reload = () => setLocal(loadLocalSites().map((s) => summarizeSite(s, s.snapshot ?? [])));
+    reload();
+    // The demo reset clears the list while this page is open.
+    window.addEventListener(SITES_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(SITES_CHANGED_EVENT, reload);
   }, []);
 
   function update(next: Partial<CollectionFilters>) {
@@ -107,13 +112,12 @@ export function SiteCollection({ seeds, initial }: { seeds: SiteSummary[]; initi
         ))}
         {rows.length === 0 && (
           <li>
-            <Card className="flex flex-col items-start gap-3 p-6">
-              <p className="font-display text-lg font-semibold">No site matches those filters.</p>
-              <p className="text-sm text-muted-foreground">Clear the search or pick another workload.</p>
-              <Button variant="secondary" size="sm" onClick={() => update({ q: "", work: "all", mode: "all" })}>
-                Clear filters
-              </Button>
-            </Card>
+            <EmptyState
+              title="No site matches those filters."
+              body="Clear the search or pick another workload."
+              cta="Clear filters"
+              onAction={() => update({ q: "", work: "all", mode: "all" })}
+            />
           </li>
         )}
       </ul>

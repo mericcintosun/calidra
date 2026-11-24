@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { LiveStripCell } from "@/components/live-strip-cell";
 import { SceneSlot } from "@/components/scene-slot";
 import { SiteCollection } from "@/components/site-collection";
+import { EmptyState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getAdapter } from "@/lib/adapter";
@@ -30,13 +31,15 @@ export default async function Home({
 
   if (sites.length === 0) {
     return (
-      <Card className="flex flex-col items-start gap-3 p-6">
-        <h1 className="text-3xl font-bold">No crew sites yet</h1>
-        <p className="text-muted-foreground">The seed list is empty. Add one from a place search.</p>
-        <Button asChild>
-          <Link href="/new">Plan a site</Link>
-        </Button>
-      </Card>
+      <div className="space-y-4">
+        <h1 className="sr-only">Crew sites</h1>
+        <EmptyState
+          title="No crew sites yet"
+          body="The seed list is empty. Add one from a place search."
+          href="/new"
+          cta="Plan a site"
+        />
+      </div>
     );
   }
 

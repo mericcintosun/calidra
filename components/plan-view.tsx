@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { animate, useReducedMotion } from "motion/react";
 import { CloudSun, Wind } from "lucide-react";
 import { Legend } from "@/components/live-strip-cell";
@@ -22,6 +21,7 @@ import {
   WORKLOAD_KEYS,
   bestStart,
   computeHeat,
+  findBandGap,
   findMismatch,
   formatSiteDate,
   hourLabel,
@@ -31,6 +31,7 @@ import {
   type HourPlan,
 } from "@/lib/heat";
 import { findLocalSite } from "@/lib/site-store";
+import { EmptyState, PageSkeleton } from "@/components/states";
 import { cn } from "@/lib/utils";
 
 /** The adapter mode of this deploy, passed down from the server page. */
@@ -69,11 +70,14 @@ export function PlanView({
   site,
   initialHours,
   initialSource,
+  initialDate,
   mode,
 }: {
   site: Site;
   initialHours: HourlyWeather[];
   initialSource?: WeatherSource;
+  /** The YYYY-MM-DD date the server resolved and fetched hours for. */
+  initialDate?: string;
   mode?: DataMode;
 }) {
   const [hours, setHours] = useState<HourlyWeather[]>(initialHours);
@@ -98,9 +102,18 @@ export function PlanView({
     shiftHours: site.shiftHours,
   });
   const [selected, setSelected] = useState<number>(13);
+  // Bumped by the "Retry live hours" button; any value above 0 forces one more request.
+  const [retry, setRetry] = useState(0);
 
+  // The server page already rendered hours from the adapter, so the browser only asks again
+  // when that is worth it: in real mode after a seed fallback (try live once more), in real mode
+  // when the browser's calendar resolves the site date to another day than the server did, when
+  // no hours came with the page, or when the lead presses retry. Fake mode never refetches.
   useEffect(() => {
     if (hasSnapshot) return;
+    const realNeedsLive =
+      mode === "real" && (initialSource === "seed" || (initialDate !== undefined && resolveDate(site.date) !== initialDate));
+    if (!(retry > 0 || !initialSource || realNeedsLive)) return;
     const ctrl = new AbortController();
     void loadHours(site, ctrl.signal).then((r) => {
       if (ctrl.signal.aborted) return;
@@ -115,13 +128,20 @@ export function PlanView({
     });
     return () => ctrl.abort();
     // Site fields are listed one by one so a new object for the same place does not refetch.
-  }, [site.slug, site.lat, site.lon, site.date, hasSnapshot]);
+  }, [site.slug, site.lat, site.lon, site.date, hasSnapshot, mode, initialSource, initialDate, retry]);
 
   const heat = useMemo(() => computeHeat(hours, site.lat, site.lon), [hours, site.lat, site.lon]);
   const plan = useMemo(() => planDay(heat, s), [heat, s]);
   const totals = shiftTotals(plan, s);
   const best = bestStart(plan, s);
-  const mismatch = findMismatch(plan.filter((h) => h.hour >= s.shiftStart && h.hour < s.shiftStart + s.shiftHours)) ?? findMismatch(plan);
+  const shift = plan.filter((h) => h.hour >= s.shiftStart && h.hour < s.shiftStart + s.shiftHours);
+  // A "Caution" hour that WBGT calls rest or stop first; on days with none (the Phoenix seed),
+  // the lowest heat index band among the rest or stop hours. The sentence prints the real band.
+  const mismatch = findMismatch(shift) ?? findMismatch(plan) ?? findBandGap(plan);
+  const retryLive = () => {
+    setLoad({ kind: "loading" });
+    setRetry((n) => n + 1);
+  };
   const focus = plan.find((h) => h.hour === selected) ?? plan[0];
   const maxStart = 24 - s.shiftHours;
   const set = (patch: Partial<PlanSettings>) => setS((prev) => ({ ...prev, ...patch }));
@@ -140,6 +160,13 @@ export function PlanView({
           <SourceBadge load={load} />
         </div>
         <DataStatement load={load} mode={mode} />
+        {load.kind === "offline" && (
+          <div>
+            <Button type="button" variant="secondary" size="sm" onClick={retryLive}>
+              Retry live hours
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
@@ -279,7 +306,12 @@ export function PlanView({
           </div>
         </div>
         {plan.length === 0 && (
-          <p className="text-sm text-muted-foreground">No hourly data for this site yet. Check the connection and reload.</p>
+          <EmptyState
+            title="No hourly data for this site yet"
+            body="The weather request returned no hours for this place and date. Plan the site again with another date."
+            href="/new"
+            cta="Plan a new site"
+          />
         )}
         {focus && <HourDetail h={focus} newCount={newCount} />}
       </Card>
@@ -455,7 +487,7 @@ function clampInt(raw: string, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
 
-/** Detail for a site created on /new: it lives in this browser's localStorage. */
+/** Detail for a site created on /new: it lives in this browser (lib/site-store.ts). */
 export function StoredSitePlan({ slug }: { slug: string }) {
   const [state, setState] = useState<{ kind: "loading" } | { kind: "found"; site: Site } | { kind: "missing" }>({ kind: "loading" });
   useEffect(() => {
@@ -463,24 +495,15 @@ export function StoredSitePlan({ slug }: { slug: string }) {
     setState(site ? { kind: "found", site } : { kind: "missing" });
   }, [slug]);
 
-  if (state.kind === "loading")
-    return (
-      <Card className="p-6 text-sm text-muted-foreground" aria-busy>
-        Opening the site saved in this browser…
-      </Card>
-    );
+  if (state.kind === "loading") return <PageSkeleton label="Opening the site saved in this browser" />;
   if (state.kind === "missing")
     return (
-      <Card className="flex flex-col items-start gap-3 p-6">
-        <h1 className="text-3xl font-bold">Site not found</h1>
-        <p className="max-w-[60ch] text-muted-foreground">
-          Sites you create are saved in the browser that created them. This one is not here, so it may have been made on
-          another device.
-        </p>
-        <Button asChild>
-          <Link href="/new">Plan a new site</Link>
-        </Button>
-      </Card>
+      <EmptyState
+        title="Site not found"
+        body="Sites you create are saved in the browser that created them. This one is not here, so it may have been made on another device or cleared by a demo reset."
+        href="/new"
+        cta="Plan a new site"
+      />
     );
   return <PlanView site={state.site} initialHours={state.site.snapshot ?? []} />;
 }
