@@ -168,14 +168,22 @@ async function testsProof() {
   const failed = Number(report.numFailedTests ?? 0);
   const skipped = Number(report.numPendingTests ?? 0) + Number(report.numTodoTests ?? 0);
   const failedNames = [];
+  const skippedNames = [];
   for (const file of report.testResults ?? []) {
     for (const a of file.assertionResults ?? []) {
-      if (a.status === "failed") failedNames.push(a.fullName ?? a.title ?? "unnamed test");
+      const name = a.fullName ?? a.title ?? "unnamed test";
+      if (a.status === "failed") failedNames.push(name);
+      else if (a.status === "skipped" || a.status === "pending" || a.status === "todo") skippedNames.push(name);
     }
   }
   let line = `Ran on ${today()} with Vitest: ${passed} passed, ${failed} failed, ${skipped} skipped.`;
   if (failedNames.length > 0) line += ` Failing: ${failedNames.slice(0, 5).join("; ")}.`;
-  return { line, summary: `tests: passed=${passed} failed=${failed} skipped=${skipped}` };
+  if (skippedNames.length > 0) line += ` Skipped on purpose: ${skippedNames.slice(0, 5).join("; ")}.`;
+  let summary = `tests: passed=${passed} failed=${failed} skipped=${skipped}`;
+  if (skipped > 0 && failed === 0) {
+    summary += skippedNames.length > 0 ? ` (all pass; skipped: ${skippedNames.slice(0, 3).join("; ")})` : " (all pass)";
+  }
+  return { line, summary };
 }
 
 function replaceBlock(text, name, line) {

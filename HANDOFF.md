@@ -541,6 +541,13 @@ Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run 
 - Human follow-up (optional cleanup): remove `ADAPTER_MODE` from the Vercel project env (`vercel env rm ADAPTER_MODE production`) so the env matches the code.
 - `proof` `tests: passed=50 failed=0 skipped=1`: a pass; the skip is the OSHA reference test waiting on `tests/wbgt-reference.json` (human task, see round 1).
 
+## QA: live crawl round 4 (2026-11-25)
+
+- The crawl reported no console, pageerror, request, visible, data or asset findings. Its only line was `proof` `tests: passed=50 failed=0 skipped=1`, which is a pass.
+- Root cause of it coming back every round: the proof summary printed a bare `skipped=1` with no reason, so it read like an open problem. The skip itself is correct: `tests/heat.test.ts` "OSHA Outdoor WBGT Calculator reference points" skips while `tests/wbgt-reference.json` is `[]`, and inventing OSHA values would fake a validation.
+- Fix: `scripts/proof.mjs` now collects skipped test names from the Vitest report, appends "Skipped on purpose: <name>" to the README tests line, and adds "(all pass; skipped: <name>)" to the summary when nothing failed. No test was removed or forced.
+- Still a human task: enter three real OSHA calculator points (hot dry, hot humid, overcast) in `tests/wbgt-reference.json`; the skip then becomes three asserting tests.
+
 ## QA: external findings
 
 - None this round.
