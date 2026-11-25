@@ -548,6 +548,13 @@ Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run 
 - Fix: `scripts/proof.mjs` now collects skipped test names from the Vitest report, appends "Skipped on purpose: <name>" to the README tests line, and adds "(all pass; skipped: <name>)" to the summary when nothing failed. No test was removed or forced.
 - Still a human task: enter three real OSHA calculator points (hot dry, hot humid, overcast) in `tests/wbgt-reference.json`; the skip then becomes three asserting tests.
 
+## QA: live crawl round 5 (2026-11-25)
+
+- `proof` `tests: passed=50 failed=0 skipped=1 (all pass; skipped: OSHA Outdoor WBGT Calculator reference points ...)`. Root cause: `tests/heat.test.ts` registered a permanent `it.skip` placeholder whenever `tests/wbgt-reference.json` is `[]`. A placeholder is not a test, and it put a skip in every proof run for a condition code cannot resolve (the values must come from a human using the OSHA calculator).
+- Fix: the OSHA suite is now data-gated (`if (points.length > 0) describe(...)`), so it registers one asserting test per reference point and nothing while the file is empty. Expected proof: `passed=50 failed=0 skipped=0`. No values were invented and no existing test was removed.
+- The gap stays visible: README "Tests" says the OSHA comparison is not yet validated, and "What we would build next" lists it. Human task unchanged: enter three real OSHA calculator points (hot dry, hot humid, overcast) as `{ name, tempC, rh, solarWm2, windMs, lat, lon, utc, oshaWbgtC }`.
+- Seen in the README demo-path proof line, not in this crawl's findings: Cuiabá 2026-11-25 came back from seed fallback after 4001 ms (the 4 s live budget). Worth watching on the next crawl.
+
 ## QA: external findings
 
 - None this round.
