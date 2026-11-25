@@ -52,11 +52,25 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://calidra.ve
 
 export type AdapterMode = "fake" | "real";
 
+let warnedIgnoredFake = false;
+
 /**
  * Live Open-Meteo is the default: all three APIs are keyless, so a deploy with no env set still
- * serves real hours (and falls back to the seed profile per request if a call fails). Only an
- * explicit ADAPTER_MODE=fake selects the offline seed adapter.
+ * serves real hours (and falls back to the seed profile per request if a call fails). An
+ * explicit ADAPTER_MODE=fake selects the offline seed adapter for local development, tests and
+ * preview deploys only. The production deploy (VERCEL_ENV=production, set by Vercel itself)
+ * always serves live hours: an ADAPTER_MODE=fake left in the project's env from the first,
+ * offline deploy used to put the public URL in sample mode, which is the bug this guards.
  */
 export function adapterMode(): AdapterMode {
-  return process.env.ADAPTER_MODE?.trim().toLowerCase() === "fake" ? "fake" : "real";
+  const wantsFake = process.env.ADAPTER_MODE?.trim().toLowerCase() === "fake";
+  if (!wantsFake) return "real";
+  if (process.env.VERCEL_ENV === "production") {
+    if (!warnedIgnoredFake) {
+      warnedIgnoredFake = true;
+      console.warn(`${LOG_PREFIX} ADAPTER_MODE=fake is ignored on the production deploy; serving live Open-Meteo hours.`);
+    }
+    return "real";
+  }
+  return "fake";
 }

@@ -534,6 +534,13 @@ Runner: `npm install`, `npm run build` (one repair round), `npm test`, `npm run 
 - `data` on `/site/kerman-grape-thinning`: the page read "Sample data: ... This deploy runs in sample mode." Root cause: the Vercel deploy has no `ADAPTER_MODE` set (`.farm-live.json` lists no env), and `adapterMode()` in `lib/config.ts` treated unset as fake, so every page served seed profiles without ever calling Open-Meteo. Fix: live is now the default (`adapterMode()` returns fake only for an explicit `ADAPTER_MODE=fake`); `.env.example`, README, DEMO and CLAUDE.md updated. The existing per-request seed fallback (timeout, one retry on 5xx and network errors, cache, `console.warn`) and its calm "Sample data:" sentence stay for genuine upstream failures.
 - `proof` `tests: passed=50 failed=0 skipped=1`: unchanged, same human task as round 1 (OSHA reference points in `tests/wbgt-reference.json`).
 
+## QA: live crawl round 3 (2026-11-25)
+
+- `data` on `/site/phoenix-desert-ridge-framing`, `/site/houston-westchase-reroof`, `/site/ceyhan-cotton-irrigation`: still "Sample data: ... This deploy runs in sample mode." after round 2 made live the code default. That sentence only renders when `adapter.mode` is `"fake"` on the server (`components/plan-view.tsx` `DataStatement`), and `adapterMode()` returns fake only for an explicit `ADAPTER_MODE=fake`. So the Vercel project env still carries `ADAPTER_MODE=fake` from the Phase 1 offline deploy (HANDOFF line about "ADAPTER_MODE=fake as the default so the first deploy has no network dependency"), and it overrides the code default. `npm run proof` from this machine reads live archive hours fine (`live-weather: archive hours=24`), so Open-Meteo itself is not the problem.
+- Fix: `lib/config.ts` `adapterMode()` now ignores `ADAPTER_MODE=fake` when `VERCEL_ENV=production` (set by Vercel itself) and logs one `console.warn`. Local dev, tests and preview deploys still honor fake. `.env.example` documents `VERCEL_ENV`; CLAUDE.md updated. The per-request seed fallback and its calm sentence ("The live Open-Meteo request did not come back") stay for genuine upstream failures.
+- Human follow-up (optional cleanup): remove `ADAPTER_MODE` from the Vercel project env (`vercel env rm ADAPTER_MODE production`) so the env matches the code.
+- `proof` `tests: passed=50 failed=0 skipped=1`: a pass; the skip is the OSHA reference test waiting on `tests/wbgt-reference.json` (human task, see round 1).
+
 ## QA: external findings
 
 - None this round.
