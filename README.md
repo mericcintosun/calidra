@@ -91,7 +91,7 @@ On any seeded site, press "Crew sheet". `/site/[slug]/print` prints a one-page w
 The settings live in the URL (`workload`, `clothing`, `crew`, `newWorkers`, `day`, `start`, `hours`), parsed with zod in `lib/plan-params.ts`. `lib/print-sheet.ts` builds the sheet from `planDay`, `shiftTotals` and `bestStart` with static EN and ES dictionaries.
 
 <!-- PROOF:BEGIN print-sheet -->
-Ran on 2026-11-24: lib/print-sheet.ts built the Phoenix sheet (workload=heavy&clothing=workClothes&crew=6&newWorkers=2&day=2&start=5&hours=8) from live archive hours in English and Spanish, 8 shift rows, 1,770 crew-minutes of rest. First row 05:00: "Normal work" / "Trabajo normal". EN: Best window: start at 16:00 (end 00:00) and save 350 crew-minutes of rest. ES: Mejor horario: empezar a las 16:00 (terminar a las 00:00) ahorra 350 minutos por persona de descanso. Same minutes in both languages: yes.
+Ran on 2026-11-25: lib/print-sheet.ts built the Phoenix sheet (workload=heavy&clothing=workClothes&crew=6&newWorkers=2&day=2&start=5&hours=8) from live archive hours in English and Spanish, 8 shift rows, 1,770 crew-minutes of rest. First row 05:00: "Normal work" / "Trabajo normal". EN: Best window: start at 16:00 (end 00:00) and save 350 crew-minutes of rest. ES: Mejor horario: empezar a las 16:00 (terminar a las 00:00) ahorra 350 minutos por persona de descanso. Same minutes in both languages: yes.
 <!-- PROOF:END print-sheet -->
 
 ## Proof
@@ -99,19 +99,19 @@ Ran on 2026-11-24: lib/print-sheet.ts built the Phoenix sheet (workload=heavy&cl
 Written by `npm run proof` (`scripts/proof.mjs`). Live weather: one archive call for Phoenix on 19 Jul 2023 through `lib/open-meteo.ts`, then the WBGT engine, the heavy-work planner and the heat index mismatch search.
 
 <!-- PROOF:BEGIN live-weather -->
-Ran on 2026-11-24: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 320 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
+Ran on 2026-11-25: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 5303 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
 <!-- PROOF:END live-weather -->
 
 Demo path: `getHours` timed through `getAdapter()` in real mode for the two demo sites, with the source that came back and the heat index band gap hour from `findBandGap`.
 
 <!-- PROOF:BEGIN demo-path -->
-Ran on 2026-11-24 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 60 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-25: 24 hours from live forecast in 166 ms, band gap at 09:00 (heat index Extreme caution, rest). Every call finished under 5 s.
+Ran on 2026-11-25 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 291 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-26: 24 hours from live forecast in 161 ms, band gap at 08:00 (heat index Extreme caution, rest). Every call finished under 5 s.
 <!-- PROOF:END demo-path -->
 
 Tests:
 
 <!-- PROOF:BEGIN tests -->
-Ran on 2026-11-24 with Vitest: 50 passed, 0 failed, 1 skipped.
+Ran on 2026-11-25 with Vitest: 50 passed, 0 failed, 1 skipped.
 <!-- PROOF:END tests -->
 
 The skipped test is the OSHA comparison: `tests/wbgt-reference.json` holds no reference points yet, so the OSHA Outdoor WBGT calculator comparison is not filled in.
