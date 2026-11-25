@@ -99,19 +99,19 @@ Ran on 2026-11-25: lib/print-sheet.ts built the Phoenix sheet (workload=heavy&cl
 Written by `npm run proof` (`scripts/proof.mjs`). Live weather: one archive call for Phoenix on 19 Jul 2023 through `lib/open-meteo.ts`, then the WBGT engine, the heavy-work planner and the heat index mismatch search.
 
 <!-- PROOF:BEGIN live-weather -->
-Ran on 2026-11-25: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 5303 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
+Ran on 2026-11-25: one Open-Meteo archive call for Phoenix (33.4484, -112.0740) on 2023-07-19 returned 24 hours in 5295 ms, solved to sun WBGT by lib/heat.ts and planned for heavy work. No hour that day reads heat index Caution or lower while sun WBGT says rest or stop.
 <!-- PROOF:END live-weather -->
 
 Demo path: `getHours` timed through `getAdapter()` in real mode for the two demo sites, with the source that came back and the heat index band gap hour from `findBandGap`.
 
 <!-- PROOF:BEGIN demo-path -->
-Ran on 2026-11-25 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 291 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-26: 24 hours from live forecast in 161 ms, band gap at 08:00 (heat index Extreme caution, rest). Every call finished under 5 s.
+Ran on 2026-11-25 through getAdapter() in real mode, cold (no Next.js cache outside the server): Phoenix 2023-07-19: 24 hours from live archive in 48 ms, band gap at 09:00 (heat index Extreme caution, rest); Cuiabá 2026-11-25: 24 hours from seed fallback in 4001 ms, band gap at 09:00 (heat index Caution, rest). Every call finished under 5 s.
 <!-- PROOF:END demo-path -->
 
 Tests:
 
 <!-- PROOF:BEGIN tests -->
-Ran on 2026-11-25 with Vitest: 50 passed, 0 failed, 1 skipped.
+Ran on 2026-11-25 with Vitest: 50 passed, 0 failed, 1 skipped. Skipped on purpose: OSHA Outdoor WBGT Calculator reference points no reference points yet: enter three OSHA calculator values in tests/wbgt-reference.json.
 <!-- PROOF:END tests -->
 
 The skipped test is the OSHA comparison: `tests/wbgt-reference.json` holds no reference points yet, so the OSHA Outdoor WBGT calculator comparison is not filled in.
